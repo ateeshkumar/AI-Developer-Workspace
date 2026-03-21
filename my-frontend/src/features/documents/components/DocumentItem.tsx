@@ -58,6 +58,19 @@ export function DocumentItem({
 
         <button
           type="button"
+          onClick={() => onSelect(node.id)}
+          className={`rounded-xl px-3 py-2 text-xs font-semibold transition ${
+            isActive
+              ? 'bg-cyan-300 text-slate-950'
+              : 'border border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.12]'
+          }`}
+          aria-label={`Open ${node.title || 'Untitled'} page`}
+        >
+          {isActive ? 'Opened' : 'Open'}
+        </button>
+
+        <button
+          type="button"
           onClick={() => onCreateChild(node.id)}
           className="h-8 w-8 rounded-full border border-white/10 bg-white/[0.04] text-sm text-slate-300 opacity-0 transition hover:bg-cyan-300 hover:text-slate-950 group-hover:opacity-100"
           aria-label="Create child page"
