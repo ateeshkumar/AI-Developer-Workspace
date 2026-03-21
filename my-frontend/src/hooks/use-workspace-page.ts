@@ -13,6 +13,7 @@ import type { CreateWorkspacePayload, WorkspaceMembership } from '../types/works
 
 const navItems: NavigationItem[] = [
   { id: 'dashboard', label: 'Dashboard' },
+  { id: 'documents', label: 'Documents' },
   { id: 'repositories', label: 'Repositories' },
   { id: 'ai-assistant', label: 'AI Assistant' },
 ]
@@ -23,6 +24,7 @@ export const useWorkspacePage = () => {
   const createWorkspaceMutation = useCreateWorkspace()
   const { toast } = useToast()
   const [activeNavItem, setActiveNavItem] = useState<NavigationItem['id']>('dashboard')
+  const [activeDocumentId, setActiveDocumentId] = useState('')
   const { token } = useAuthStore()
   const editorStore = useEditorStore()
   const {
@@ -99,7 +101,8 @@ export const useWorkspacePage = () => {
   const openWorkspace = (membership: WorkspaceMembership) => {
     setWorkspaceId(membership.workspace.id)
     setRepoId(membership.workspace.repos[0]?.id ?? '')
-    setActiveNavItem('repositories')
+    setActiveDocumentId('')
+    setActiveNavItem('documents')
   }
 
   const createWorkspace = (payload: CreateWorkspacePayload) => {
@@ -119,10 +122,12 @@ export const useWorkspacePage = () => {
 
   return {
     activeNavItem,
+    activeDocumentId,
     createWorkspace,
     healthLabel,
     navItems,
     openWorkspace,
+    selectDocument: setActiveDocumentId,
     selectFile,
     selectRepository,
     setActiveNavItem,

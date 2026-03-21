@@ -1,6 +1,7 @@
 import { MainHeader } from '../components/navigation/main-header'
 import { SidebarNav } from '../components/navigation/sidebar-nav'
 import { AIAssistantContent } from '../features/ai/components/ai-assistant-content'
+import { DocumentContent } from '../features/documents/components/document-content'
 import { RepositoryContent } from '../features/repositories/components/repository-content'
 import { useWorkspacePage } from '../hooks/use-workspace-page'
 import { EditorLayout } from '../layouts/editor-layout'
@@ -9,12 +10,14 @@ import { Dashboard } from './Dashboard'
 export function WorkspacePage() {
   const {
     activeNavItem,
+    activeDocumentId,
     createWorkspace,
     createWorkspaceMutation,
     editorStore,
     healthLabel,
     navItems,
     openWorkspace,
+    selectDocument,
     selectFile,
     selectRepository,
     setActiveNavItem,
@@ -43,6 +46,12 @@ export function WorkspacePage() {
         isCreatingWorkspace={createWorkspaceMutation.isPending}
         onCreateWorkspace={createWorkspace}
         onOpenWorkspace={openWorkspace}
+      />
+    ) : activeNavItem === 'documents' ? (
+      <DocumentContent
+        workspaceId={workspaceId}
+        activeDocumentId={activeDocumentId}
+        onSelectDocument={selectDocument}
       />
     ) : activeNavItem === 'ai-assistant' ? (
       <AIAssistantContent
@@ -80,7 +89,7 @@ export function WorkspacePage() {
       header={
         <MainHeader
           title="Engineering workspace"
-          description="A reusable application layout with sidebar navigation, profile-aware header controls, and flexible content panels for dashboard, repositories, and AI tooling."
+          description="A reusable application layout with sidebar navigation, profile-aware header controls, and flexible content panels for dashboard, document editing, repositories, and AI tooling."
           healthLabel={healthLabel}
           socketConnected={socketConnected}
         />

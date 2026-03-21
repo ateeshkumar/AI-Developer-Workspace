@@ -8,6 +8,7 @@ const workspaceRoutes = require("./routes/workspace.routes");
 const repoRoutes = require("./routes/repo.routes");
 const fileRoutes = require("./routes/file.routes");
 const versionRoutes = require("./routes/version.routes");
+const documentRoutes = require("./routes/document.routes");
 const { errorHandler } = require("./middleware/error.middleware");
 
 const app = express();
@@ -26,6 +27,7 @@ app.use("/api/workspaces", workspaceRoutes);
 app.use("/api", repoRoutes);
 app.use("/api", fileRoutes);
 app.use("/api", versionRoutes);
+app.use("/api", documentRoutes);
 
 app.use(errorHandler);
 

@@ -37,6 +37,8 @@ model User {
   reposCreated   Repo[]                @relation("RepoCreator")
   fileVersions   FileVersion[]
   commitsCreated Commit[]
+  documentsCreated Document[]          @relation("DocumentCreator")
+  documentsUpdated Document[]          @relation("DocumentUpdater")
 }
 
 model RefreshToken {
@@ -60,6 +62,31 @@ model Workspace {
   members     WorkspaceMember[]
   invitations WorkspaceInvitation[]
   repos       Repo[]
+  documents   Document[]
+}
+
+model Document {
+  id            String     @id @default(uuid())
+  title         String
+  markdown      String?
+  content       Json       @default("[]")
+  position      Int        @default(0)
+  isArchived    Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  workspaceId   String
+  parentId      String?
+  createdById   String
+  updatedById   String?
+  workspace     Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parent        Document?  @relation("DocumentTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children      Document[] @relation("DocumentTree")
+  createdBy     User       @relation("DocumentCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  updatedBy     User?      @relation("DocumentUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, parentId, position])
+  @@index([workspaceId, updatedAt])
+  @@index([parentId])
 }
 
 model WorkspaceMember {

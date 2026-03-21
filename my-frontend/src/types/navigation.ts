@@ -1,4 +1,4 @@
 export type NavigationItem = {
-  id: 'dashboard' | 'repositories' | 'ai-assistant'
+  id: 'dashboard' | 'documents' | 'repositories' | 'ai-assistant'
   label: string
 }
