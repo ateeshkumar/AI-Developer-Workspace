@@ -1,0 +1,168 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum WorkspaceRole {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+}
+
+enum FileChangeType {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+model User {
+  id             String                @id @default(uuid())
+  name           String
+  email          String                @unique
+  passwordHash   String
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  refreshTokens  RefreshToken[]
+  memberships    WorkspaceMember[]
+  sentInvites    WorkspaceInvitation[] @relation("InvitationSender")
+  reposCreated   Repo[]                @relation("RepoCreator")
+  fileVersions   FileVersion[]
+  commitsCreated Commit[]
+}
+
+model RefreshToken {
+  id         String   @id @default(uuid())
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  revokedAt  DateTime?
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Workspace {
+  id          String                @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  members     WorkspaceMember[]
+  invitations WorkspaceInvitation[]
+  repos       Repo[]
+}
+
+model WorkspaceMember {
+  id          String        @id @default(uuid())
+  role        WorkspaceRole
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  workspaceId String
+  userId      String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+model WorkspaceInvitation {
+  id          String           @id @default(uuid())
+  email       String
+  role        WorkspaceRole
+  status      InvitationStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  workspaceId String
+  invitedById String
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedBy   User             @relation("InvitationSender", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([email])
+}
+
+model Repo {
+  id           String    @id @default(uuid())
+  name         String
+  description  String?
+  provider     String?
+  remoteUrl    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  workspaceId  String
+  createdById  String
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy    User      @relation("RepoCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  files        RepoFile[]
+  commits      Commit[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model RepoFile {
+  id          String        @id @default(uuid())
+  path        String
+  name        String
+  isDeleted   Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  repoId      String
+  repo        Repo          @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  versions    FileVersion[]
+
+  @@unique([repoId, path])
+  @@index([repoId])
+}
+
+model FileVersion {
+  id             String              @id @default(uuid())
+  versionNumber  Int
+  changeType     FileChangeType
+  content        String?
+  summary        String?
+  createdAt      DateTime            @default(now())
+  fileId         String
+  createdById    String
+  file           RepoFile            @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  createdBy      User                @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  commitLinks    CommitFileVersion[]
+
+  @@unique([fileId, versionNumber])
+  @@index([fileId, createdAt])
+}
+
+model Commit {
+  id            String              @id @default(uuid())
+  message       String
+  createdAt     DateTime            @default(now())
+  repoId        String
+  createdById   String
+  repo          Repo                @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  createdBy     User                @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  fileVersions  CommitFileVersion[]
+
+  @@index([repoId, createdAt])
+}
+
+model CommitFileVersion {
+  id            String      @id @default(uuid())
+  commitId      String
+  fileVersionId String      @unique
+  commit        Commit      @relation(fields: [commitId], references: [id], onDelete: Cascade)
+  fileVersion   FileVersion @relation(fields: [fileVersionId], references: [id], onDelete: Cascade)
+
+  @@unique([commitId, fileVersionId])
+  @@index([commitId])
+}

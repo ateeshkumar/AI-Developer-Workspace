@@ -1,0 +1,6 @@
+__pycache__
+*.pyc
+vector-db
+embeddings
+uvicorn.stdout.log
+uvicorn.stderr.log

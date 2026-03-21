@@ -1,0 +1,70 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: project-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ai_hit
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./my-backend
+    container_name: project-backend
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    command: sh -c "npx prisma db push && npm start"
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ai_hit
+      JWT_SECRET: supersecret
+      JWT_REFRESH_SECRET: superrefreshsecret
+    ports:
+      - "3000:3000"
+
+  frontend:
+    build:
+      context: ./my-frontend
+    container_name: project-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+  ai-service:
+    build:
+      context: ./ai-service
+    container_name: project-ai-service
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      AI_PROJECT_ROOT: /workspace
+      AI_INCLUDE_DIRS: my-backend,my-frontend
+      AI_AUTO_INDEX_ON_STARTUP: "false"
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      OLLAMA_CHAT_MODEL: qwen2.5-coder:7b
+      OLLAMA_EMBED_MODEL: nomic-embed-text
+      RUNNER_TIMEOUT_SECONDS: 10
+      RUNNER_MEMORY_LIMIT: 256m
+      RUNNER_CPU_LIMIT: 0.5
+      RUNNER_PIDS_LIMIT: 64
+      RUNNER_OUTPUT_LIMIT: 20000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/workspace:ro
+      - ai_vector_db:/app/vector-db
+      - ai_embeddings:/app/embeddings
+
+volumes:
+  postgres_data:
+  ai_vector_db:
+  ai_embeddings:

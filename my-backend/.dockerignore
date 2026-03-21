@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log
+backend.stdout.log
+backend.stderr.log
+filedebug.stdout.log
+filedebug.stderr.log
+filedebug2.stdout.log
+filedebug2.stderr.log
+http.stdout.log
+http.stderr.log
+smoke.stdout.log
+smoke.stderr.log
+.env
