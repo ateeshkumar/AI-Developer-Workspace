@@ -1,5 +1,10 @@
 const fileService = require("../services/file.service");
 const { getCollaborationGateway } = require("../services/collaboration.service");
+const {
+  acquireFileLock,
+  getFileLock,
+  releaseFileLock,
+} = require("../services/repo-lock.service");
 
 const createFile = async (req, res, next) => {
   try {
@@ -119,6 +124,63 @@ const uploadFiles = async (req, res, next) => {
   }
 };
 
+const getFileLockStatus = async (req, res, next) => {
+  try {
+    const lock = getFileLock(req.params.repoId, req.params.fileId);
+    res.json({ lock });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const acquireLock = async (req, res, next) => {
+  try {
+    const lock = acquireFileLock({
+      repoId: req.params.repoId,
+      fileId: req.params.fileId,
+      user: req.user,
+    });
+    const gateway = getCollaborationGateway();
+
+    if (gateway) {
+      gateway.notifyFileLockChanged("file:lock", {
+        repoId: req.params.repoId,
+        fileId: req.params.fileId,
+        lock,
+        actor: req.user,
+      });
+    }
+
+    res.json({ lock });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const releaseLock = async (req, res, next) => {
+  try {
+    const released = releaseFileLock({
+      repoId: req.params.repoId,
+      fileId: req.params.fileId,
+      userId: req.user.id,
+    });
+    const gateway = getCollaborationGateway();
+
+    if (gateway && released) {
+      gateway.notifyFileLockChanged("file:unlock", {
+        repoId: req.params.repoId,
+        fileId: req.params.fileId,
+        lock: released,
+        actor: req.user,
+      });
+    }
+
+    res.json({ lock: null });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createFile,
   updateFile,
@@ -126,4 +188,7 @@ module.exports = {
   getFileTree,
   getFileHistory,
   uploadFiles,
+  getFileLockStatus,
+  acquireLock,
+  releaseLock,
 };

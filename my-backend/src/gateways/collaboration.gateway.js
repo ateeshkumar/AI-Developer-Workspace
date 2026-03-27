@@ -311,6 +311,20 @@ class CollaborationGateway {
     });
   }
 
+  notifyFileLockChanged(eventType, payload) {
+    this.broadcastToRepo(payload.repoId, {
+      type: eventType,
+      ...payload,
+      timestamp: new Date().toISOString(),
+    });
+
+    this.broadcastToFile(payload.fileId, {
+      type: eventType,
+      ...payload,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   broadcastToRepo(repoId, message, excludedSocket = null) {
     const subscribers = this.repoSubscriptions.get(repoId);
     if (!subscribers) return;

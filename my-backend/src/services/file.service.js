@@ -1,20 +1,23 @@
 const prisma = require("../config/prisma");
 const ApiError = require("../utils/api-error");
+const { assertFileWriteAllowed } = require("./repo-lock.service");
+
+const TEXT_MIME_PREFIXES = ["text/"];
+const TEXT_MIME_TYPES = new Set([
+  "application/json",
+  "application/xml",
+  "application/javascript",
+  "application/typescript",
+  "application/x-sh",
+  "application/x-httpd-php",
+  "application/x-yaml",
+]);
 
 const joinUploadPath = (prefix, filename) => {
-  const normalizedPrefix = prefix
-    ? String(prefix).replace(/\\/g, "/").replace(/^\/+|\/+$/g, "")
-    : "";
-  const sanitizedFilename = String(filename || "")
-    .replace(/\\/g, "/")
-    .split("/")
-    .pop();
+  const normalizedPrefix = prefix ? normalizePath(prefix) : "";
+  const normalizedFilename = normalizePath(filename);
 
-  if (!sanitizedFilename) {
-    throw new ApiError(400, "Uploaded file name is invalid");
-  }
-
-  return normalizedPrefix ? `${normalizedPrefix}/${sanitizedFilename}` : sanitizedFilename;
+  return normalizedPrefix ? `${normalizedPrefix}/${normalizedFilename}` : normalizedFilename;
 };
 
 const normalizePath = (path) => {
@@ -31,6 +34,24 @@ const normalizePath = (path) => {
   }
 
   return normalized;
+};
+
+const isTextUpload = (file) => {
+  const mimeType = String(file?.mimetype || "").toLowerCase();
+
+  return (
+    TEXT_MIME_PREFIXES.some((prefix) => mimeType.startsWith(prefix)) ||
+    TEXT_MIME_TYPES.has(mimeType)
+  );
+};
+
+const encodeUploadedFileContent = (file) => {
+  if (isTextUpload(file)) {
+    return file.buffer.toString("utf8");
+  }
+
+  const mimeType = file.mimetype || "application/octet-stream";
+  return `data:${mimeType};base64,${file.buffer.toString("base64")}`;
 };
 
 const buildFileTree = (files) => {
@@ -171,7 +192,7 @@ const uploadFiles = async (repoId, userId, payload, files) => {
     const path = joinUploadPath(pathPrefix, file.originalname);
     const result = await createFile(repoId, userId, {
       path,
-      content: file.buffer.toString("utf8"),
+      content: encodeUploadedFileContent(file),
       summary: `Uploaded ${file.originalname}`,
     });
 
@@ -189,6 +210,8 @@ const uploadFiles = async (repoId, userId, payload, files) => {
 };
 
 const updateFile = async (repoId, fileId, userId, payload) => {
+  assertFileWriteAllowed({ repoId, fileId, userId });
+
   const file = await prisma.repoFile.findFirst({
     where: {
       id: fileId,
@@ -225,6 +248,8 @@ const updateFile = async (repoId, fileId, userId, payload) => {
 };
 
 const deleteFile = async (repoId, fileId, userId, payload = {}) => {
+  assertFileWriteAllowed({ repoId, fileId, userId });
+
   const file = await prisma.repoFile.findFirst({
     where: {
       id: fileId,

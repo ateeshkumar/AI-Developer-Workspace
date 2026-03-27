@@ -8,6 +8,9 @@ const {
   getFileTree,
   getFileHistory,
   uploadFiles,
+  getFileLockStatus,
+  acquireLock,
+  releaseLock,
 } = require("../controllers/file.controller");
 const { requireAuth } = require("../middleware/auth.middleware");
 const { requireRepoRole } = require("../middleware/repo-role.middleware");
@@ -35,12 +38,30 @@ router.get(
   requireRepoRole("VIEWER"),
   getFileHistory
 );
+router.get(
+  "/repos/:repoId/files/:fileId/lock",
+  requireAuth,
+  requireRepoRole("VIEWER"),
+  getFileLockStatus
+);
 router.post("/repos/:repoId/files", requireAuth, requireRepoRole("EDITOR"), createFile);
 router.patch(
   "/repos/:repoId/files/:fileId",
   requireAuth,
   requireRepoRole("EDITOR"),
   updateFile
+);
+router.put(
+  "/repos/:repoId/files/:fileId/lock",
+  requireAuth,
+  requireRepoRole("EDITOR"),
+  acquireLock
+);
+router.delete(
+  "/repos/:repoId/files/:fileId/lock",
+  requireAuth,
+  requireRepoRole("EDITOR"),
+  releaseLock
 );
 router.delete(
   "/repos/:repoId/files/:fileId",
