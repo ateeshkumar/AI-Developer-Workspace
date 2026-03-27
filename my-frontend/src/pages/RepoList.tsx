@@ -54,28 +54,30 @@ export function RepoList({
 
   return (
     <section className="panel-dark-soft rounded-[1.75rem] p-5">
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <div className="max-w-md">
           <div className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-200/75">
             Repositories
           </div>
           <h2 className="mt-2 font-['Space_Grotesk',_'Segoe_UI',_sans-serif] text-2xl font-semibold text-white">
             Repository listing
           </h2>
-          <p className="mt-2 text-sm text-slate-400">
+          <p className="mt-2 max-w-sm text-sm leading-7 text-slate-400">
             View every repository in this workspace, create a new one, or open one to explore files.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-medium text-slate-200">
+        <div className="grid gap-3 sm:grid-cols-[auto_1fr] lg:flex lg:items-center">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-center text-sm font-medium text-slate-200">
             {repositories.length} repo{repositories.length === 1 ? '' : 's'}
           </div>
-          <CreateRepoModal
-            isPending={createRepositoryMutation.isPending}
-            onCreate={createRepo}
-            disabled={!workspaceId}
-          />
+          <div className="sm:justify-self-start lg:justify-self-auto">
+            <CreateRepoModal
+              isPending={createRepositoryMutation.isPending}
+              onCreate={createRepo}
+              disabled={!workspaceId}
+            />
+          </div>
         </div>
       </div>
 
