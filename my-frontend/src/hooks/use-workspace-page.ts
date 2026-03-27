@@ -101,8 +101,10 @@ export const useWorkspacePage = () => {
   const openWorkspace = (membership: WorkspaceMembership) => {
     setWorkspaceId(membership.workspace.id)
     setRepoId(membership.workspace.repos[0]?.id ?? '')
+    setFile('', '')
+    setContent('')
     setActiveDocumentId('')
-    setActiveNavItem('documents')
+    setActiveNavItem('repositories')
   }
 
   const createWorkspace = (payload: CreateWorkspacePayload) => {
