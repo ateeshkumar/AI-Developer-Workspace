@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { useToast } from '../hooks/use-toast'
@@ -35,7 +35,15 @@ export function FileUpload({
   const { toast } = useToast()
   const [isDragging, setIsDragging] = useState(false)
   const [uploads, setUploads] = useState<UploadItem[]>([])
-  const inputRef = useRef<HTMLInputElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const directoryInputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (directoryInputRef.current) {
+      directoryInputRef.current.setAttribute('webkitdirectory', '')
+      directoryInputRef.current.setAttribute('directory', '')
+    }
+  }, [])
 
   const updateUpload = (id: string, patch: Partial<UploadItem>) => {
     setUploads((current) =>
@@ -43,14 +51,18 @@ export function FileUpload({
     )
   }
 
-  const handleFiles = async (files: FileList | File[]) => {
+  const handleFiles = async (incomingFiles: FileList | File[]) => {
+    const files = Array.from(incomingFiles)
+
     if (!repoId || files.length === 0) {
       return
     }
 
-    const nextItems = Array.from(files).map((file) => ({
+    const nextItems = files.map((file) => ({
       id: `${file.name}-${file.size}-${Math.random().toString(36).slice(2)}`,
-      name: file.name,
+      name:
+        (file as File & { webkitRelativePath?: string }).webkitRelativePath ||
+        file.name,
       sizeLabel: formatFileSize(file.size),
       progress: 0,
       status: 'queued' as const,
@@ -62,39 +74,50 @@ export function FileUpload({
       ...current,
     ])
 
-    for (const item of nextItems) {
+    nextItems.forEach((item) => {
       updateUpload(item.id, { status: 'uploading', progress: 0 })
+    })
 
-      try {
-        await uploadRepositoryFile({
-          repoId,
-          file: item.file,
-          onProgress: (progress) => {
+    try {
+      await uploadRepositoryFile({
+        repoId,
+        files: nextItems.map((item) => item.file),
+        onProgress: (progress) => {
+          nextItems.forEach((item) => {
             updateUpload(item.id, { progress })
-          },
-        })
+          })
+        },
+      })
 
+      nextItems.forEach((item) => {
         updateUpload(item.id, {
           progress: 100,
           status: 'uploaded',
         })
-      } catch {
+      })
+
+      queryClient.invalidateQueries({
+        queryKey: ['repository-tree', repoId],
+      })
+
+      toast({
+        title: 'Upload finished',
+        description:
+          'Uploaded files were processed and the repository tree was refreshed.',
+        tone: 'success',
+      })
+    } catch {
+      nextItems.forEach((item) => {
         updateUpload(item.id, {
           status: 'error',
         })
-      }
+      })
+      toast({
+        title: 'Upload failed',
+        description: 'The files could not be uploaded. Check your permissions and try again.',
+        tone: 'error',
+      })
     }
-
-    queryClient.invalidateQueries({
-      queryKey: ['repository-tree', repoId],
-    })
-
-    toast({
-      title: 'Upload finished',
-      description:
-        'Uploaded files were processed. If the backend upload endpoint is active, the file tree will refresh.',
-      tone: 'success',
-    })
   }
 
   return (
@@ -115,15 +138,36 @@ export function FileUpload({
         <button
           type="button"
           disabled={!repoId}
-          onClick={() => inputRef.current?.click()}
+          onClick={() => fileInputRef.current?.click()}
           className="rounded-2xl bg-cyan-300 px-4 py-3 text-sm font-semibold text-slate-950 hover:-translate-y-0.5 hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
         >
           Upload files
         </button>
+
+        <button
+          type="button"
+          disabled={!repoId}
+          onClick={() => directoryInputRef.current?.click()}
+          className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-semibold text-slate-100 hover:-translate-y-0.5 hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          Upload folder
+        </button>
       </div>
 
       <input
-        ref={inputRef}
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(event) => {
+          if (event.target.files) {
+            void handleFiles(event.target.files)
+          }
+          event.target.value = ''
+        }}
+      />
+      <input
+        ref={directoryInputRef}
         type="file"
         multiple
         className="hidden"
@@ -159,7 +203,7 @@ export function FileUpload({
           Drag and drop files here
         </div>
         <div className="mt-2 text-sm text-slate-500">
-          Supports multiple files. Files upload using multipart form data.
+          Supports multiple files and folder uploads. Folder paths are preserved in the tree.
         </div>
       </div>
 

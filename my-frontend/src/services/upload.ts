@@ -4,7 +4,7 @@ import { api } from './api'
 
 export type UploadFileParams = {
   repoId: string
-  file: File
+  files: File[]
   onProgress?: (progress: number) => void
 }
 
@@ -18,12 +18,18 @@ export type UploadFileResponse = {
 
 export const uploadRepositoryFile = async ({
   repoId,
-  file,
+  files,
   onProgress,
 }: UploadFileParams) => {
   const formData = new FormData()
-  formData.append('file', file)
   formData.append('repoId', repoId)
+
+  files.forEach((file) => {
+    const relativePath =
+      (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name
+
+    formData.append('file', file, relativePath)
+  })
 
   const { data } = await api.post<UploadFileResponse>('/file/upload', formData, {
     headers: {
