@@ -9,10 +9,16 @@ type UseRepositoryEditorSyncOptions = {
   content: string
   latestPersistedContent: string
   socketConnected: boolean
+  canEdit: boolean
   onEditorChange: (value: string) => void
 }
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
+type PresenceUser = {
+  id: string
+  name: string
+  email: string
+}
 
 export const useRepositoryEditorSync = ({
   repoId,
@@ -20,11 +26,13 @@ export const useRepositoryEditorSync = ({
   content,
   latestPersistedContent,
   socketConnected,
+  canEdit,
   onEditorChange,
 }: UseRepositoryEditorSyncOptions) => {
   const autoSaveMutation = useAutoSaveFile()
   const { toast } = useToast()
   const [saveState, setSaveState] = useState<SaveState>('idle')
+  const [presenceUsers, setPresenceUsers] = useState<PresenceUser[]>([])
   const isHydratingContentRef = useRef(false)
   const isApplyingRemoteUpdateRef = useRef(false)
   const socket = useMemo(() => getSocketClient(), [])
@@ -76,6 +84,33 @@ export const useRepositoryEditorSync = ({
   }, [fileId, repoId, socket, socketConnected])
 
   useEffect(() => {
+    if (!fileId) {
+      setPresenceUsers([])
+      return
+    }
+
+    const handlePresenceUpdate = (
+      message:
+        | { type: 'file:joined'; fileId?: string; presence?: PresenceUser[] }
+        | { type: 'presence:update'; fileId?: string; users?: PresenceUser[] },
+    ) => {
+      if (message.fileId !== fileId) {
+        return
+      }
+
+      setPresenceUsers(message.type === 'file:joined' ? message.presence ?? [] : message.users ?? [])
+    }
+
+    socket.on('file:joined', handlePresenceUpdate)
+    socket.on('presence:update', handlePresenceUpdate)
+
+    return () => {
+      socket.off('file:joined', handlePresenceUpdate)
+      socket.off('presence:update', handlePresenceUpdate)
+    }
+  }, [fileId, socket])
+
+  useEffect(() => {
     const handleRealtimeUpdate = (
       message:
         | { type: 'file:update'; fileId?: string; content?: string }
@@ -108,7 +143,7 @@ export const useRepositoryEditorSync = ({
   }, [content, fileId, onEditorChange, socket])
 
   useEffect(() => {
-    if (!repoId || !fileId || !socketConnected) {
+    if (!repoId || !fileId || !socketConnected || !canEdit) {
       return
     }
 
@@ -129,10 +164,10 @@ export const useRepositoryEditorSync = ({
     return () => {
       window.clearTimeout(timeout)
     }
-  }, [content, fileId, repoId, socket, socketConnected])
+  }, [canEdit, content, fileId, repoId, socket, socketConnected])
 
   useEffect(() => {
-    if (!fileId || !repoId) {
+    if (!fileId || !repoId || !canEdit) {
       return
     }
 
@@ -164,7 +199,7 @@ export const useRepositoryEditorSync = ({
     return () => {
       window.clearTimeout(timeout)
     }
-  }, [autoSaveMutation, content, fileId, repoId, toast])
+  }, [autoSaveMutation, canEdit, content, fileId, repoId, toast])
 
   useEffect(() => {
     if (saveState !== 'saved') {
@@ -181,6 +216,7 @@ export const useRepositoryEditorSync = ({
   }, [saveState])
 
   return {
+    presenceUsers,
     saveState,
   }
 }
