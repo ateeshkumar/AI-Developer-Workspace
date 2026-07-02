@@ -44,6 +44,13 @@ services:
     image: ollama/ollama:latest
     container_name: project-ollama
     restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     ports:
       - "11434:11434"
     volumes:

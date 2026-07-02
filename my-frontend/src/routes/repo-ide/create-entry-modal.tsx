@@ -70,6 +70,17 @@ export function CreateEntryModal({
   const [destination, setDestination] = useState(defaultDestination)
   const [name, setName] = useState('')
 
+  // The modal component itself stays mounted (Modal only hides its content when
+  // closed), so re-sync the destination each time it transitions to open for a
+  // new location, rather than only reading defaultDestination once at mount.
+  const [wasOpen, setWasOpen] = useState(isOpen)
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen)
+    if (isOpen) {
+      setDestination(defaultDestination)
+    }
+  }
+
   const close = () => {
     setType('file')
     setDestination('')

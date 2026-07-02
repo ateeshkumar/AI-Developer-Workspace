@@ -81,6 +81,19 @@ export type RepoFileHistory = {
   versions: FileVersion[]
 }
 
+export type RepoFileRef = {
+  id: string
+  path: string
+  name: string
+  isDeleted: boolean
+  repoId: string
+}
+
+export type FileMutationResult = {
+  file: RepoFileRef
+  version: FileVersion
+}
+
 export type RepoSearchResult = {
   fileId: string
   name: string

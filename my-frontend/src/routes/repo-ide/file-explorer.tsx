@@ -116,10 +116,7 @@ export function FileExplorer({ activeRepo }: { activeRepo: Repo | null }) {
       setIsCreateModalOpen(false)
 
       if (type === 'file') {
-        const created = result as { file?: { id: string; path: string } }
-        if (created.file) {
-          openFile(created.file.id, created.file.path)
-        }
+        openFile(result.file.id, result.file.path)
       }
     } catch {
       pushToast({
@@ -158,7 +155,7 @@ export function FileExplorer({ activeRepo }: { activeRepo: Repo | null }) {
         <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200/75">Files</div>
         <div className="flex gap-2">
           {canEdit ? (
-            <button type="button" onClick={() => void handleNewFile()} className="text-xs text-slate-400 hover:text-white">
+            <button type="button" onClick={() => openCreateModal('')} className="text-xs text-slate-400 hover:text-white">
               + New
             </button>
           ) : null}
@@ -189,12 +186,20 @@ export function FileExplorer({ activeRepo }: { activeRepo: Repo | null }) {
       <div className="min-h-[160px] flex-1 overflow-y-auto rounded-xl border border-white/10 bg-white/[0.02] p-2">
         {treeQuery.isLoading ? (
           <div className="p-2 text-xs text-slate-500">Loading files...</div>
-        ) : (treeQuery.data ?? []).length === 0 ? (
+        ) : (treeQuery.data ?? []).filter((node) => !isPlaceholderFile(node)).length === 0 ? (
           <div className="p-2 text-xs text-slate-500">No files yet.</div>
         ) : (
-          (treeQuery.data ?? []).map((node) => (
-            <TreeNode key={node.path} node={node} activeFileId={fileId} onSelect={openFile} />
-          ))
+          (treeQuery.data ?? [])
+            .filter((node) => !isPlaceholderFile(node))
+            .map((node) => (
+              <TreeNode
+                key={node.path}
+                node={node}
+                activeFileId={fileId}
+                onSelect={openFile}
+                onCreateHere={canEdit ? openCreateModal : undefined}
+              />
+            ))
         )}
       </div>
 
@@ -285,6 +290,15 @@ export function FileExplorer({ activeRepo }: { activeRepo: Repo | null }) {
           ) : null}
         </div>
       </div>
+
+      <CreateEntryModal
+        isOpen={isCreateModalOpen}
+        tree={treeQuery.data ?? []}
+        defaultDestination={createDestination}
+        isCreating={createFileMutation.isPending}
+        onClose={() => setIsCreateModalOpen(false)}
+        onCreate={(path, type) => void handleCreateEntry(path, type)}
+      />
     </div>
   )
 }

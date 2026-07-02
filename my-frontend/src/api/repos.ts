@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiRequest, apiUpload } from './http'
 import type {
   FileLock,
+  FileMutationResult,
   FileTreeNode,
   IndexRepoResult,
   Repo,
@@ -30,13 +31,13 @@ export const getFileHistory = (repoId: string, fileId: string) =>
   apiRequest<RepoFileHistory>(`/repos/${repoId}/files/${fileId}/history`)
 
 export const createFile = (repoId: string, payload: { path: string; content?: string; summary?: string }) =>
-  apiRequest(`/repos/${repoId}/files`, { method: 'POST', body: payload })
+  apiRequest<FileMutationResult>(`/repos/${repoId}/files`, { method: 'POST', body: payload })
 
 export const updateFile = (
   repoId: string,
   fileId: string,
   payload: { content: string; summary?: string }
-) => apiRequest(`/repos/${repoId}/files/${fileId}`, { method: 'PATCH', body: payload })
+) => apiRequest<FileMutationResult>(`/repos/${repoId}/files/${fileId}`, { method: 'PATCH', body: payload })
 
 export const deleteFile = (repoId: string, fileId: string) =>
   apiRequest(`/repos/${repoId}/files/${fileId}`, { method: 'DELETE' })
