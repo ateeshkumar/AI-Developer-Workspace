@@ -1,6 +1,5 @@
 import base64
 import io
-import socket
 import tarfile
 import time
 import uuid
@@ -46,15 +45,15 @@ def ensure_image(client) -> None:
 
 
 def get_host_ip() -> str:
-    if HOST_PUBLIC_IP:
-        return HOST_PUBLIC_IP
-
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
-            probe.connect(("8.8.8.8", 80))
-            return probe.getsockname()[0]
-    except OSError:
-        return "127.0.0.1"
+    # ai-service always runs inside a container in this project's deployment model.
+    # A socket-based "outbound IP" probe run from in here would return the
+    # container's own address on the Docker bridge network (e.g. 172.18.0.x),
+    # which is unreachable from the browser -- not the Docker host's real address.
+    # Default to "localhost", which Docker Desktop's published ports forward
+    # correctly for the common case (browser on the same machine as the Docker
+    # host). Set HOST_PUBLIC_IP explicitly when the browser is on a different
+    # machine (LAN IP, remote VM, devcontainer, etc.).
+    return HOST_PUBLIC_IP or "localhost"
 
 
 def _file_bytes(content: str) -> bytes:

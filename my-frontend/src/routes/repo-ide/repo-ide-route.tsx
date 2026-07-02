@@ -7,6 +7,7 @@ import { AssistantPane } from './assistant-pane'
 import { EditorPane } from './editor-pane'
 import { FileExplorer } from './file-explorer'
 import { IdeProvider, useIde } from './ide-context'
+import { TerminalPane } from './terminal-pane'
 
 const indexedRepoIds = new Set<string>()
 
@@ -39,7 +40,12 @@ function IdeShell() {
       }`}
     >
       <FileExplorer activeRepo={activeRepo} />
-      <EditorPane />
+      <div className="flex min-h-0 flex-col gap-4">
+        <div className="min-h-0 flex-1">
+          <EditorPane />
+        </div>
+        <TerminalPane />
+      </div>
       <AssistantPane />
     </div>
   )

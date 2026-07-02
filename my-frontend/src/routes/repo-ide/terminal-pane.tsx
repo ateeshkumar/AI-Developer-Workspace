@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import {
   AI_SERVICE_ORIGIN,
+  destroyTerminalSession,
   useCreateTerminalSession,
   useDestroyTerminalSession,
   useTerminalSessionPorts,
@@ -107,7 +108,7 @@ export function TerminalPane() {
   useEffect(() => {
     return () => {
       if (sessionId) {
-        void destroyTerminalSessionOnUnmount(repoId, sessionId)
+        void destroyTerminalSession(repoId, sessionId).catch(() => {})
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -154,9 +155,4 @@ export function TerminalPane() {
       <div ref={containerRef} className="flex-1 overflow-hidden p-2" />
     </div>
   )
-}
-
-const destroyTerminalSessionOnUnmount = async (repoId: string, sessionId: string) => {
-  const { destroyTerminalSession } = await import('../../api/terminal')
-  await destroyTerminalSession(repoId, sessionId).catch(() => {})
 }
