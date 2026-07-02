@@ -1,4 +1,4 @@
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -89,6 +89,24 @@ class PRReviewResponse(BaseModel):
     sources: List[SourceChunk]
     prompt_preview: str
     extra: Optional[Any] = None
+
+
+class TerminalFile(BaseModel):
+    path: str
+    content: str
+
+
+class CreateTerminalSessionRequest(BaseModel):
+    repo_id: str
+    repo_name: str
+    user_id: str
+    files: List[TerminalFile] = Field(default_factory=list)
+
+
+class TerminalSessionResponse(BaseModel):
+    session_id: str
+    host: str
+    ports: Dict[str, Optional[int]]
 
 
 class ExecuteRequest(BaseModel):

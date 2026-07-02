@@ -85,12 +85,19 @@ services:
       RUNNER_CPU_LIMIT: 0.5
       RUNNER_PIDS_LIMIT: 64
       RUNNER_OUTPUT_LIMIT: 20000
+      JWT_SECRET: supersecret
+      HOST_PUBLIC_IP: ""
+      TERMINAL_MEMORY_LIMIT: 256m
+      TERMINAL_CPU_LIMIT: 0.5
+      TERMINAL_PIDS_LIMIT: 128
+      TERMINAL_IDLE_TIMEOUT_SECONDS: 1800
     ports:
       - "8000:8000"
     volumes:
       - ./:/workspace:ro
       - ai_vector_db:/app/vector-db
       - ai_embeddings:/app/embeddings
+      - /var/run/docker.sock:/var/run/docker.sock
 
 volumes:
   postgres_data:

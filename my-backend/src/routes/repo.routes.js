@@ -8,6 +8,11 @@ const {
   getRepoWorkspaceSummary,
 } = require("../controllers/repo.controller");
 const { indexRepo } = require("../controllers/ai.controller");
+const {
+  createTerminalSession,
+  destroyTerminalSession,
+  getTerminalSessionPorts,
+} = require("../controllers/terminal.controller");
 const { requireAuth } = require("../middleware/auth.middleware");
 const { requireWorkspaceRole } = require("../middleware/workspace-role.middleware");
 const { requireRepoRole } = require("../middleware/repo-role.middleware");
@@ -37,5 +42,24 @@ router.get(
   getRepoWorkspaceSummary
 );
 router.post("/repos/:repoId/index", requireAuth, requireRepoRole("VIEWER"), indexRepo);
+
+router.post(
+  "/repos/:repoId/terminal/session",
+  requireAuth,
+  requireRepoRole("EDITOR"),
+  createTerminalSession
+);
+router.get(
+  "/repos/:repoId/terminal/session/:sessionId/ports",
+  requireAuth,
+  requireRepoRole("EDITOR"),
+  getTerminalSessionPorts
+);
+router.delete(
+  "/repos/:repoId/terminal/session/:sessionId",
+  requireAuth,
+  requireRepoRole("EDITOR"),
+  destroyTerminalSession
+);
 
 module.exports = router;

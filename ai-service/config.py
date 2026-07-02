@@ -68,6 +68,17 @@ RUNNER_CPU_LIMIT = os.getenv("RUNNER_CPU_LIMIT", "0.5")
 RUNNER_PIDS_LIMIT = int(os.getenv("RUNNER_PIDS_LIMIT", "64"))
 RUNNER_OUTPUT_LIMIT = int(os.getenv("RUNNER_OUTPUT_LIMIT", "20000"))
 
+JWT_SECRET = os.getenv("JWT_SECRET")
+HOST_PUBLIC_IP = os.getenv("HOST_PUBLIC_IP", "").strip()
+
+TERMINAL_IMAGE_TAG = os.getenv("TERMINAL_IMAGE_TAG", "workspace-terminal:latest")
+TERMINAL_IMAGE_DIR = SERVICE_DIR / "terminal-image"
+TERMINAL_MEMORY_LIMIT = os.getenv("TERMINAL_MEMORY_LIMIT", "256m")
+TERMINAL_CPU_LIMIT = float(os.getenv("TERMINAL_CPU_LIMIT", "0.5"))
+TERMINAL_PIDS_LIMIT = int(os.getenv("TERMINAL_PIDS_LIMIT", "128"))
+TERMINAL_IDLE_TIMEOUT_SECONDS = int(os.getenv("TERMINAL_IDLE_TIMEOUT_SECONDS", str(30 * 60)))
+TERMINAL_CANDIDATE_PORTS = (3000, 5173, 4200, 8080, 5000, 8000)
+
 
 def ensure_directories() -> None:
     VECTOR_DB_DIR.mkdir(parents=True, exist_ok=True)
