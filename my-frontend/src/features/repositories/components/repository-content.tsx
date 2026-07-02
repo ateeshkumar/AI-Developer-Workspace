@@ -13,6 +13,7 @@ import {
   useRepositorySummary,
   useRepositoryTree,
 } from '../../../hooks/use-repositories'
+import { usePullGithubRepo, usePushGithubRepo } from '../../../hooks/use-github'
 import { useToast } from '../../../hooks/use-toast'
 import { FileTree } from '../../../components/FileTree'
 import { useRepositoryEditorSync } from '../../../hooks/use-repository-editor-sync'
@@ -72,15 +73,21 @@ export function RepositoryContent({
   const fileLockQuery = useFileLock(repoId, fileId)
   const acquireLockMutation = useAcquireFileLock()
   const releaseLockMutation = useReleaseFileLock()
+  const pullGithubMutation = usePullGithubRepo()
+  const pushGithubMutation = usePushGithubRepo()
   const currentUserId = user?.id ?? null
   const role = summaryQuery.data?.role ?? null
   const activeLock = fileLockQuery.data ?? null
   const currentUserOwnsLock = activeLock?.user.id === currentUserId
   const canEdit = Boolean(fileId && role && role !== 'VIEWER' && currentUserOwnsLock)
 
-  const selectedRepoName = useMemo(() => {
-    return repositoriesQuery.data?.find((repo) => repo.id === repoId)?.name ?? 'No repo selected'
+  const activeRepo = useMemo(() => {
+    return repositoriesQuery.data?.find((repo) => repo.id === repoId) ?? null
   }, [repositoriesQuery.data, repoId])
+
+  const selectedRepoName = activeRepo?.name ?? 'No repo selected'
+  const isGithubRepo = activeRepo?.provider === 'github'
+  const canSyncGithub = Boolean(repoId && isGithubRepo && role && role !== 'VIEWER')
 
   const latestPersistedContent = useMemo(() => {
     const versions = historyQuery.data?.versions ?? []
@@ -270,6 +277,61 @@ export function RepositoryContent({
     }
   }
 
+  const handlePullFromGithub = async () => {
+    if (!repoId) {
+      return
+    }
+
+    try {
+      const result = await pullGithubMutation.mutateAsync(repoId)
+      toast({
+        title: 'Pulled from GitHub',
+        description: `${result.created} created, ${result.updated} updated, ${result.deleted} deleted.`,
+        tone: 'success',
+      })
+    } catch {
+      toast({
+        title: 'Pull failed',
+        description: 'Could not sync the latest changes from GitHub.',
+        tone: 'error',
+      })
+    }
+  }
+
+  const handlePushToGithub = async () => {
+    if (!repoId) {
+      return
+    }
+
+    try {
+      const result = await pushGithubMutation.mutateAsync({ repoId })
+
+      if (result.conflict) {
+        toast({
+          title: 'Push conflict',
+          description: result.conflict.message,
+          tone: 'error',
+        })
+        return
+      }
+
+      toast({
+        title: 'Pushed to GitHub',
+        description:
+          result.pushed.length === 0
+            ? 'No changes to push.'
+            : `${result.pushed.length} file(s) pushed in one commit.`,
+        tone: 'success',
+      })
+    } catch {
+      toast({
+        title: 'Push failed',
+        description: 'Could not push changes to GitHub.',
+        tone: 'error',
+      })
+    }
+  }
+
   const formatTimestamp = (value: string) =>
     new Date(value).toLocaleString([], {
       dateStyle: 'medium',
@@ -378,6 +440,44 @@ export function RepositoryContent({
               {socketConnected ? 'Connected' : 'Offline'}
             </div>
           </div>
+          {isGithubRepo ? (
+            <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="font-medium text-white">GitHub sync</div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    {activeRepo?.githubOwner}/{activeRepo?.githubRepo}
+                    {activeRepo?.githubLastSyncedAt
+                      ? ` · last synced ${formatTimestamp(activeRepo.githubLastSyncedAt)}`
+                      : null}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  disabled={!canSyncGithub || pullGithubMutation.isPending}
+                  onClick={() => void handlePullFromGithub()}
+                  className="rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {pullGithubMutation.isPending ? 'Pulling...' : 'Pull latest from GitHub'}
+                </button>
+                <button
+                  type="button"
+                  disabled={!canSyncGithub || pushGithubMutation.isPending}
+                  onClick={() => void handlePushToGithub()}
+                  className="rounded-xl bg-cyan-300 px-3 py-2 text-xs font-semibold text-slate-950 hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {pushGithubMutation.isPending ? 'Pushing...' : 'Push changes to GitHub'}
+                </button>
+              </div>
+              {!canSyncGithub ? (
+                <div className="mt-2 text-xs text-slate-500">
+                  Your role must be editor or higher to sync with GitHub.
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {repoId && !fileId ? (
             <div className="mt-4 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4 text-sm text-cyan-100">
               Repository opened. Choose a file from the explorer to load it in the editor.

@@ -23,6 +23,7 @@ This workspace contains three main apps:
 - JWT auth
 - workspace/repo/file/version/commit APIs
 - WebSocket collaboration gateway
+- GitHub two-way sync (PAT-based connect, import, pull, and squashed-commit push via the GitHub Git Data API)
 
 ### AI Service
 
@@ -222,6 +223,7 @@ Required backend env:
 DATABASE_URL="postgresql://postgres:your_password@localhost:5432/ai_hit"
 JWT_SECRET="your_secret"
 JWT_REFRESH_SECRET="your_refresh_secret"
+GITHUB_TOKEN_ENC_KEY="base64-encoded-32-byte-key"
 ```
 
 ### AI Service

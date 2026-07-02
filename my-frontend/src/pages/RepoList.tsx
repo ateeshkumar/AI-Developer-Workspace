@@ -2,6 +2,7 @@ import { useToast } from '../hooks/use-toast'
 import { useCreateRepository } from '../hooks/use-repositories'
 import type { Repository } from '../types/repository'
 import { CreateRepoModal } from '../components/CreateRepoModal'
+import { GithubImportModal } from '../components/GithubImportModal'
 import { RepoCard } from '../components/RepoCard'
 import { Skeleton } from '../components/ui/skeleton'
 
@@ -71,11 +72,16 @@ export function RepoList({
           <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-center text-sm font-medium text-slate-200">
             {repositories.length} repo{repositories.length === 1 ? '' : 's'}
           </div>
-          <div className="sm:justify-self-start lg:justify-self-auto">
+          <div className="flex flex-wrap gap-3 sm:justify-self-start lg:justify-self-auto">
             <CreateRepoModal
               isPending={createRepositoryMutation.isPending}
               onCreate={createRepo}
               disabled={!workspaceId}
+            />
+            <GithubImportModal
+              workspaceId={workspaceId}
+              disabled={!workspaceId}
+              onImported={onOpenRepo}
             />
           </div>
         </div>

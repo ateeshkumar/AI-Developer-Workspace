@@ -43,6 +43,14 @@ Backend API for auth, users, workspaces, repos, files, versions, and commits.
 - List repos in a workspace
 - Link repo to workspace
 
+### GitHub Sync Module
+
+- Connect a GitHub account via a Personal Access Token (encrypted at rest, AES-256-GCM)
+- List the connected account's GitHub repositories
+- Preview and import a GitHub repository into a workspace (file tree + contents, batched insert)
+- Pull (re-sync) upstream changes into the imported repo's file/version history
+- Push local edits back to GitHub as a single squashed commit (blob → tree → commit → ref update via the Git Data API), with conflict detection on non-fast-forward pushes
+
 ### File Module
 
 - Create file
@@ -97,6 +105,7 @@ JWT_SECRET="your_access_secret"
 JWT_REFRESH_SECRET="your_refresh_secret_optional"
 ACCESS_TOKEN_TTL="15m"
 REFRESH_TOKEN_TTL="7d"
+GITHUB_TOKEN_ENC_KEY="base64-encoded-32-byte-key"
 PORT=3000
 ```
 
@@ -681,6 +690,8 @@ curl -X POST http://localhost:3000/api/repos/REPO_ID/commits ^
 
 - Schema changes are tracked as Prisma migrations in `prisma/migrations`; apply them with `npm run migrate:deploy` (or `prisma migrate dev` while developing)
 - `docker-compose.yml` runs `prisma migrate deploy` on container start, so the migration history is the source of truth for the schema
+- `GITHUB_TOKEN_ENC_KEY` must be a base64-encoded 32-byte key (generate with `openssl rand -base64 32`). GitHub Personal Access Tokens are encrypted with AES-256-GCM using this key before being stored — rotating the key invalidates every stored connection, and the affected user must reconnect via `POST /api/github/connection`
+- A GitHub PAT needs the `repo` scope to import/sync private repositories, or `public_repo` if you only need public ones
 
 ## Suggested Next Improvements
 

@@ -9,6 +9,7 @@ const repoRoutes = require("./routes/repo.routes");
 const fileRoutes = require("./routes/file.routes");
 const versionRoutes = require("./routes/version.routes");
 const documentRoutes = require("./routes/document.routes");
+const githubRoutes = require("./routes/github.routes");
 const { errorHandler } = require("./middleware/error.middleware");
 
 const app = express();
@@ -28,6 +29,7 @@ app.use("/api", repoRoutes);
 app.use("/api", fileRoutes);
 app.use("/api", versionRoutes);
 app.use("/api", documentRoutes);
+app.use("/api", githubRoutes);
 
 app.use(errorHandler);
 

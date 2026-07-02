@@ -24,6 +24,12 @@ enum FileChangeType {
   DELETE
 }
 
+enum GithubSyncStatus {
+  PULLED
+  PUSHED
+  CONFLICT
+}
+
 model User {
   id             String                @id @default(uuid())
   name           String
@@ -39,6 +45,18 @@ model User {
   commitsCreated Commit[]
   documentsCreated Document[]          @relation("DocumentCreator")
   documentsUpdated Document[]          @relation("DocumentUpdater")
+  githubConnection GithubConnection?
+}
+
+model GithubConnection {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  encryptedToken String
+  githubLogin    String
+  scopes         String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model RefreshToken {
@@ -120,34 +138,43 @@ model WorkspaceInvitation {
 }
 
 model Repo {
-  id           String    @id @default(uuid())
-  name         String
-  description  String?
-  provider     String?
-  remoteUrl    String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  workspaceId  String
-  createdById  String
-  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  createdBy    User      @relation("RepoCreator", fields: [createdById], references: [id], onDelete: Cascade)
-  files        RepoFile[]
-  commits      Commit[]
+  id                  String    @id @default(uuid())
+  name                String
+  description         String?
+  provider            String?
+  remoteUrl           String?
+  githubOwner         String?
+  githubRepo          String?
+  githubDefaultBranch String?
+  githubImportedAt    DateTime?
+  githubLastSyncedAt  DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  workspaceId         String
+  createdById         String
+  workspace           Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy           User      @relation("RepoCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  files               RepoFile[]
+  commits             Commit[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId])
+  @@index([githubOwner, githubRepo])
 }
 
 model RepoFile {
-  id          String        @id @default(uuid())
-  path        String
-  name        String
-  isDeleted   Boolean       @default(false)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  repoId      String
-  repo        Repo          @relation(fields: [repoId], references: [id], onDelete: Cascade)
-  versions    FileVersion[]
+  id                String            @id @default(uuid())
+  path              String
+  name              String
+  isDeleted         Boolean           @default(false)
+  githubBlobSha     String?
+  githubSyncStatus  GithubSyncStatus?
+  githubSyncedAt    DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  repoId            String
+  repo              Repo              @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  versions          FileVersion[]
 
   @@unique([repoId, path])
   @@index([repoId])

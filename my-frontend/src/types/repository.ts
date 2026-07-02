@@ -4,6 +4,11 @@ export type Repository = {
   description: string | null
   provider: string | null
   remoteUrl: string | null
+  githubOwner?: string | null
+  githubRepo?: string | null
+  githubDefaultBranch?: string | null
+  githubImportedAt?: string | null
+  githubLastSyncedAt?: string | null
   createdAt: string
   updatedAt: string
   workspaceId: string

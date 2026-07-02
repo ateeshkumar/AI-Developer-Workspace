@@ -25,6 +25,7 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ai_hit
       JWT_SECRET: supersecret
       JWT_REFRESH_SECRET: superrefreshsecret
+      GITHUB_TOKEN_ENC_KEY: "ul1oAv+hfOLFs7SAPRWALG+hFxylqfCr5N45LBunQ0c="
     ports:
       - "3000:3000"
 
