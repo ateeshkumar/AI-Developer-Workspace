@@ -8,6 +8,7 @@ import type { AIMessage, AIQueryResponse } from '../types/ai'
 type UseAIChatOptions = {
   seedPrompt?: string
   contextHint?: string
+  repoId?: string
 }
 
 const createMessage = (role: AIMessage['role'], content: string): AIMessage => ({
@@ -31,6 +32,7 @@ const buildAssistantResponse = (data: AIQueryResponse) =>
 export const useAIChat = ({
   seedPrompt = '',
   contextHint = '',
+  repoId,
 }: UseAIChatOptions) => {
   const { toast } = useToast()
   const [messages, setMessages] = useState<AIMessage[]>([
@@ -79,7 +81,7 @@ export const useAIChat = ({
     }
 
     const fullPrompt = contextHint ? `${trimmed}\n\nContext:\n${contextHint}` : trimmed
-    queryMutation.mutate({ question: fullPrompt })
+    queryMutation.mutate({ question: fullPrompt, repoId })
   }
 
   return {

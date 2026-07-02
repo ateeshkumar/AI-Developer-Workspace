@@ -232,10 +232,41 @@ const getRepoWorkspaceSummary = async (repoId, userId) => {
   };
 };
 
+const getRepoFilesForIndexing = async (repoId) => {
+  const repo = await prisma.repo.findUnique({ where: { id: repoId } });
+
+  if (!repo) {
+    throw new ApiError(404, "Repo not found");
+  }
+
+  const files = await prisma.repoFile.findMany({
+    where: { repoId, isDeleted: false },
+    include: {
+      versions: {
+        orderBy: { versionNumber: "desc" },
+        take: 1,
+        select: { content: true },
+      },
+    },
+    orderBy: { path: "asc" },
+  });
+
+  return {
+    repo,
+    files: files
+      .map((file) => {
+        const content = file.versions[0]?.content || "";
+        return content.startsWith("data:") ? null : { path: file.path, content };
+      })
+      .filter(Boolean),
+  };
+};
+
 module.exports = {
   createRepo,
   listRepos,
   searchRepoFiles,
   getRepoActivity,
   getRepoWorkspaceSummary,
+  getRepoFilesForIndexing,
 };

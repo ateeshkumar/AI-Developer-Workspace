@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { useAppHealth } from './use-app-health'
+import { useIndexRepo } from './use-ai-index'
 import { useCreateWorkspace, useWorkspaces } from './use-workspaces'
 import { useToast } from './use-toast'
 import { setAuthToken } from '../services/api'
@@ -22,6 +23,8 @@ export const useWorkspacePage = () => {
   const healthQuery = useAppHealth()
   const workspacesQuery = useWorkspaces()
   const createWorkspaceMutation = useCreateWorkspace()
+  const indexRepoMutation = useIndexRepo()
+  const indexedRepoIdsRef = useRef<Set<string>>(new Set())
   const { toast } = useToast()
   const [activeNavItem, setActiveNavItem] = useState<NavigationItem['id']>('dashboard')
   const [activeDocumentId, setActiveDocumentId] = useState('')
@@ -98,13 +101,25 @@ export const useWorkspacePage = () => {
     return healthQuery.data?.ok ? 'Backend healthy' : 'Backend response unknown'
   }, [healthQuery.data, healthQuery.isError, healthQuery.isLoading])
 
+  const triggerIndexIfNeeded = (id: string) => {
+    if (!id || indexedRepoIdsRef.current.has(id)) {
+      return
+    }
+
+    indexedRepoIdsRef.current.add(id)
+    indexRepoMutation.mutate(id)
+  }
+
   const openWorkspace = (membership: WorkspaceMembership) => {
+    const firstRepoId = membership.workspace.repos[0]?.id ?? ''
+
     setWorkspaceId(membership.workspace.id)
-    setRepoId(membership.workspace.repos[0]?.id ?? '')
+    setRepoId(firstRepoId)
     setFile('', '')
     setContent('')
     setActiveDocumentId('')
     setActiveNavItem('repositories')
+    triggerIndexIfNeeded(firstRepoId)
   }
 
   const createWorkspace = (payload: CreateWorkspacePayload) => {
@@ -115,6 +130,7 @@ export const useWorkspacePage = () => {
     setRepoId(repository.id)
     setFile('', '')
     setContent('')
+    triggerIndexIfNeeded(repository.id)
   }
 
   const selectFile = (nextFileId: string, nextFilePath: string) => {
@@ -136,6 +152,7 @@ export const useWorkspacePage = () => {
     token,
     workspacesQuery,
     createWorkspaceMutation,
+    indexRepoMutation,
     editorStore,
   }
 }

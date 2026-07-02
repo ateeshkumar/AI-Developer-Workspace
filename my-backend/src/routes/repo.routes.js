@@ -7,6 +7,7 @@ const {
   getRepoActivity,
   getRepoWorkspaceSummary,
 } = require("../controllers/repo.controller");
+const { indexRepo } = require("../controllers/ai.controller");
 const { requireAuth } = require("../middleware/auth.middleware");
 const { requireWorkspaceRole } = require("../middleware/workspace-role.middleware");
 const { requireRepoRole } = require("../middleware/repo-role.middleware");
@@ -35,5 +36,6 @@ router.get(
   requireRepoRole("VIEWER"),
   getRepoWorkspaceSummary
 );
+router.post("/repos/:repoId/index", requireAuth, requireRepoRole("VIEWER"), indexRepo);
 
 module.exports = router;

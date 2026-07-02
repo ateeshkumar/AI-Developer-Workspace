@@ -41,10 +41,22 @@ def ensure_index(include_dirs: List[str] | None = None) -> Dict:
     return get_index_summary()
 
 
-def retrieve_context(question: str, top_k: int = TOP_K) -> Tuple[List[Dict], Dict]:
-    summary = ensure_index()
+def retrieve_context(
+    question: str, top_k: int = TOP_K, repo_id: str | None = None
+) -> Tuple[List[Dict], Dict]:
+    if repo_id is not None:
+        vector_store.initialize()
+        summary = vector_store.get_metadata(f"index_summary:repo:{repo_id}") or {
+            "indexed_files": 0,
+            "indexed_chunks": 0,
+            "included_roots": [],
+            "created_at": None,
+        }
+    else:
+        summary = ensure_index()
+
     query_embedding = embed_text(question)
-    matches = vector_store.search(query_embedding, limit=top_k)
+    matches = vector_store.search(query_embedding, limit=top_k, repo_id=repo_id)
     return matches, summary
 
 
@@ -91,7 +103,9 @@ def _build_user_prompt(task: str, payload: Dict, matches: List[Dict]) -> str:
 
 def run_task(task: str, payload: Dict) -> Dict:
     query_text = payload.get("question") or payload.get("target") or payload.get("code") or payload.get("diff") or task
-    matches, summary = retrieve_context(query_text, top_k=payload.get("top_k") or TOP_K)
+    matches, summary = retrieve_context(
+        query_text, top_k=payload.get("top_k") or TOP_K, repo_id=payload.get("repo_id")
+    )
     prompt = _build_user_prompt(task, payload, matches)
     answer = generate_text(SYSTEM_PROMPTS[task], prompt)
 

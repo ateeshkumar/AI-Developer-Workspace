@@ -15,6 +15,7 @@ export function WorkspacePage() {
     createWorkspaceMutation,
     editorStore,
     healthLabel,
+    indexRepoMutation,
     navItems,
     openWorkspace,
     selectDocument,
@@ -34,6 +35,7 @@ export function WorkspacePage() {
     socketConnected,
     openTabs,
     setFile,
+    setRepoId,
     closeFileTab,
     setContent,
   } = editorStore
@@ -69,7 +71,12 @@ export function WorkspacePage() {
         openTabs={openTabs}
         accessToken={token ?? ''}
         socketConnected={socketConnected}
+        indexRepoMutation={indexRepoMutation}
         onSelectRepo={selectRepository}
+        onBackToRepoList={() => {
+          setRepoId('')
+          setContent('')
+        }}
         onSelectFile={selectFile}
         onSelectTab={(tab) => setFile(tab.fileId, tab.filePath)}
         onCloseTab={closeFileTab}

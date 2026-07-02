@@ -5,15 +5,18 @@ import { AIMessageBubble } from './ai-message-bubble'
 type AIChatPanelProps = {
   seedPrompt?: string
   contextHint?: string
+  repoId?: string
 }
 
 export function AIChatPanel({
   seedPrompt = '',
   contextHint = '',
+  repoId,
 }: AIChatPanelProps) {
   const { input, isPending, messages, setInput, submitQuestion } = useAIChat({
     seedPrompt,
     contextHint,
+    repoId,
   })
 
   return (

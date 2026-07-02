@@ -69,7 +69,7 @@ def _hash_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def _split_into_chunks(repo_name: str, file_path: Path, text: str) -> List[Chunk]:
+def _build_chunks(repo_name: str, path_str: str, rel_path: str, text: str) -> List[Chunk]:
     lines = text.splitlines() or [""]
     chunks: List[Chunk] = []
     current_lines: List[str] = []
@@ -83,11 +83,10 @@ def _split_into_chunks(repo_name: str, file_path: Path, text: str) -> List[Chunk
         if current_lines and current_length + line_length > CHUNK_SIZE:
             content = "\n".join(current_lines).strip()
             if content:
-                rel_path = file_path.relative_to(PROJECT_ROOT).as_posix()
                 chunks.append(
                     Chunk(
                         repo_name=repo_name,
-                        file_path=str(file_path),
+                        file_path=path_str,
                         rel_path=rel_path,
                         chunk_index=len(chunks),
                         start_line=start_line,
@@ -107,11 +106,10 @@ def _split_into_chunks(repo_name: str, file_path: Path, text: str) -> List[Chunk
 
     final_content = "\n".join(current_lines).strip()
     if final_content:
-        rel_path = file_path.relative_to(PROJECT_ROOT).as_posix()
         chunks.append(
             Chunk(
                 repo_name=repo_name,
-                file_path=str(file_path),
+                file_path=path_str,
                 rel_path=rel_path,
                 chunk_index=len(chunks),
                 start_line=start_line,
@@ -122,6 +120,11 @@ def _split_into_chunks(repo_name: str, file_path: Path, text: str) -> List[Chunk
         )
 
     return chunks
+
+
+def _split_into_chunks(repo_name: str, file_path: Path, text: str) -> List[Chunk]:
+    rel_path = file_path.relative_to(PROJECT_ROOT).as_posix()
+    return _build_chunks(repo_name, str(file_path), rel_path, text)
 
 
 def _resolve_roots(include_dirs: List[str]) -> List[Path]:
@@ -176,6 +179,58 @@ def index_repositories(include_dirs: List[str] | None = None) -> dict:
     }
     vector_store.upsert_metadata("index_summary", summary)
     EMBEDDING_MANIFEST_PATH.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    return summary
+
+
+def index_repo_files(repo_id: str, repo_name: str, files: List[dict]) -> dict:
+    vector_store.initialize()
+    vector_store.clear_index(repo_id=repo_id)
+
+    chunks: List[Chunk] = []
+    indexed_files = 0
+
+    for file in files:
+        path_str = file.get("path") or ""
+        text = file.get("content") or ""
+
+        if not path_str or text.startswith("data:"):
+            continue
+
+        file_chunks = _build_chunks(repo_name, path_str, path_str, text)
+        if file_chunks:
+            indexed_files += 1
+            chunks.extend(file_chunks)
+
+    created_at = datetime.now(timezone.utc).isoformat()
+    rows = []
+    for chunk in chunks:
+        rows.append(
+            {
+                "id": str(uuid.uuid4()),
+                "repo_name": chunk.repo_name,
+                "file_path": chunk.file_path,
+                "rel_path": chunk.rel_path,
+                "chunk_index": chunk.chunk_index,
+                "start_line": chunk.start_line,
+                "end_line": chunk.end_line,
+                "content": chunk.content,
+                "embedding": embed_text(chunk.content),
+                "file_hash": chunk.file_hash,
+                "created_at": created_at,
+                "repo_id": repo_id,
+            }
+        )
+
+    if rows:
+        vector_store.insert_chunks(rows)
+
+    summary = {
+        "indexed_files": indexed_files,
+        "indexed_chunks": len(rows),
+        "included_roots": [repo_name],
+        "created_at": created_at,
+    }
+    vector_store.upsert_metadata(f"index_summary:repo:{repo_id}", summary)
     return summary
 
 

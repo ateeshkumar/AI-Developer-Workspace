@@ -4,13 +4,14 @@ from config import AUTO_INDEX_ON_STARTUP, OLLAMA_BASE_URL, ensure_directories
 from docker_runner import CodeExecutionError, RunnerUnavailableError, execute_code
 from llm_client import LocalModelError
 from rag_engine import ensure_index, run_pr_review, run_task
-from repo_indexer import get_index_summary, index_repositories
+from repo_indexer import get_index_summary, index_repo_files, index_repositories
 from schemas import (
     AIRequest,
     AIResponse,
     DiffStats,
     ExecuteRequest,
     ExecuteResponse,
+    IndexRepoRequest,
     IndexRequest,
     PRReviewRequest,
     PRReviewResponse,
@@ -59,6 +60,18 @@ def status():
 def ai_index(payload: IndexRequest):
     try:
         return index_repositories(payload.include_dirs)
+    except LocalModelError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@app.post("/ai/index-repo")
+def ai_index_repo(payload: IndexRepoRequest):
+    try:
+        return index_repo_files(
+            payload.repo_id,
+            payload.repo_name,
+            [f.model_dump() for f in payload.files],
+        )
     except LocalModelError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
 

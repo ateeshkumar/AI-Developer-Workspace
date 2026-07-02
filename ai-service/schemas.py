@@ -7,6 +7,17 @@ class IndexRequest(BaseModel):
     include_dirs: List[str] = Field(default_factory=list)
 
 
+class IndexRepoFile(BaseModel):
+    path: str
+    content: str
+
+
+class IndexRepoRequest(BaseModel):
+    repo_id: str
+    repo_name: str
+    files: List[IndexRepoFile] = Field(default_factory=list)
+
+
 class SourceChunk(BaseModel):
     repo_name: str
     rel_path: str
@@ -25,6 +36,7 @@ class AIRequest(BaseModel):
     code: Optional[str] = None
     diff: Optional[str] = None
     instructions: Optional[str] = None
+    repo_id: Optional[str] = None
 
 
 class AIResponse(BaseModel):

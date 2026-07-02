@@ -2,6 +2,14 @@ export type AIMessageRole = 'user' | 'assistant'
 
 export type AIQueryPayload = {
   question: string
+  repoId?: string
+}
+
+export type IndexRepoResponse = {
+  indexed_files: number
+  indexed_chunks: number
+  included_roots: string[]
+  created_at: string | null
 }
 
 export type AIMessage = {

@@ -2,7 +2,7 @@ import json
 import math
 import sqlite3
 from contextlib import contextmanager
-from typing import Dict, Iterable, List
+from typing import Dict, Iterable, List, Optional
 
 from config import VECTOR_DB_PATH, ensure_directories
 
@@ -47,10 +47,19 @@ def initialize() -> None:
             """
         )
 
+        try:
+            connection.execute("ALTER TABLE chunks ADD COLUMN repo_id TEXT")
+        except sqlite3.OperationalError as error:
+            if "duplicate column" not in str(error).lower():
+                raise
 
-def clear_index() -> None:
+
+def clear_index(repo_id: Optional[str] = None) -> None:
     with _connect() as connection:
-        connection.execute("DELETE FROM chunks")
+        if repo_id is not None:
+            connection.execute("DELETE FROM chunks WHERE repo_id = ?", (repo_id,))
+        else:
+            connection.execute("DELETE FROM chunks")
 
 
 def upsert_metadata(key: str, value: Dict) -> None:
@@ -90,8 +99,9 @@ def insert_chunks(rows: Iterable[Dict]) -> None:
                 content,
                 embedding,
                 file_hash,
-                created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                created_at,
+                repo_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -106,6 +116,7 @@ def insert_chunks(rows: Iterable[Dict]) -> None:
                     json.dumps(row["embedding"]),
                     row["file_hash"],
                     row["created_at"],
+                    row.get("repo_id"),
                 )
                 for row in rows
             ],
@@ -129,23 +140,31 @@ def _cosine_similarity(a: List[float], b: List[float]) -> float:
     return dot_product / (norm_a * norm_b)
 
 
-def search(query_embedding: List[float], limit: int = 6) -> List[Dict]:
+def search(
+    query_embedding: List[float], limit: int = 6, repo_id: Optional[str] = None
+) -> List[Dict]:
+    query = """
+        SELECT
+            id,
+            repo_name,
+            file_path,
+            rel_path,
+            chunk_index,
+            start_line,
+            end_line,
+            content,
+            embedding,
+            repo_id
+        FROM chunks
+        """
+    params = ()
+
+    if repo_id is not None:
+        query += " WHERE repo_id = ?"
+        params = (repo_id,)
+
     with _connect() as connection:
-        rows = connection.execute(
-            """
-            SELECT
-                id,
-                repo_name,
-                file_path,
-                rel_path,
-                chunk_index,
-                start_line,
-                end_line,
-                content,
-                embedding
-            FROM chunks
-            """
-        ).fetchall()
+        rows = connection.execute(query, params).fetchall()
 
     scored_rows = []
     for row in rows:
@@ -154,6 +173,7 @@ def search(query_embedding: List[float], limit: int = 6) -> List[Dict]:
             {
                 "id": row["id"],
                 "repo_name": row["repo_name"],
+                "repo_id": row["repo_id"],
                 "file_path": row["file_path"],
                 "rel_path": row["rel_path"],
                 "chunk_index": row["chunk_index"],
