@@ -51,6 +51,17 @@ Backend API for auth, users, workspaces, repos, files, versions, and commits.
 - Pull (re-sync) upstream changes into the imported repo's file/version history
 - Push local edits back to GitHub as a single squashed commit (blob → tree → commit → ref update via the Git Data API), with conflict detection on non-fast-forward pushes
 
+### AI Module
+
+- Proxies chat/query requests to `ai-service`, optionally scoped to a `repoId`
+- `POST /api/repos/:repoId/index` fetches a repo's current file content straight from Postgres (reusing the same query as `getRepoFilesForIndexing`) and hands it to `ai-service` for repo-scoped RAG indexing — this backend never talks to the vector store itself, it's a pure content bridge
+
+### Terminal Module
+
+- `POST /api/repos/:repoId/terminal/session` fetches a repo's files from Postgres (same bridge pattern as AI indexing) and asks `ai-service` to spawn a sandboxed, interactive Docker container for it
+- The frontend connects its terminal WebSocket **directly** to `ai-service` (not proxied through this backend) — this backend's role is just session creation/teardown and supplying repo content
+- `GET .../terminal/session/:sessionId/ports` / `DELETE .../terminal/session/:sessionId` proxy straight through to `ai-service`
+
 ### File Module
 
 - Create file
@@ -114,6 +125,7 @@ Notes:
 
 - `JWT_REFRESH_SECRET` is optional. If omitted, `JWT_SECRET` is used for refresh tokens too.
 - `PORT` defaults to `3000`.
+- `JWT_SECRET` must match the `JWT_SECRET` set on `ai-service` — the terminal feature's WebSocket verifies the same access tokens this backend issues, independently of this backend (no session state is shared beyond the token itself)
 
 ## Installation
 
@@ -357,6 +369,38 @@ Content-Type: application/json
 GET /api/workspaces/:workspaceId/repos
 Authorization: Bearer <access_token>
 ```
+
+#### Search, Activity, Summary, AI Indexing
+
+```http
+GET  /api/repos/:repoId/search?q=<query>       (VIEWER)
+GET  /api/repos/:repoId/activity?limit=30      (VIEWER)
+GET  /api/repos/:repoId/summary                (VIEWER)
+POST /api/repos/:repoId/index                  (VIEWER) -> triggers repo-scoped AI indexing
+```
+
+#### GitHub Sync
+
+```http
+POST   /api/github/connection                              (auth only)  { "token": "<personal access token>" }
+GET    /api/github/connection                               (auth only)  -> connection status
+DELETE /api/github/connection                                (auth only)  -> disconnect
+GET    /api/github/repos                                     (auth only)  -> list the connected account's GitHub repos
+GET    /api/github/repos/:owner/:repo/preview                (auth only)  -> file counts before importing
+POST   /api/workspaces/:workspaceId/repos/import              (EDITOR)     { "owner", "repo", "name?", "description?" }
+POST   /api/repos/:repoId/github/pull                          (EDITOR)     -> re-sync from GitHub
+POST   /api/repos/:repoId/github/push                          (EDITOR)     { "commitMessage?" } -> squashed push
+```
+
+#### Terminal Sessions
+
+```http
+POST   /api/repos/:repoId/terminal/session                            (EDITOR) -> { session_id, host, ports }
+GET    /api/repos/:repoId/terminal/session/:sessionId/ports            (EDITOR)
+DELETE /api/repos/:repoId/terminal/session/:sessionId                   (EDITOR)
+```
+
+The frontend uses the returned `session_id` to open a WebSocket directly against `ai-service` (`ws://<ai-service-host>:8000/terminal/:sessionId?token=<access_token>`) — this backend does not proxy that connection.
 
 ### File Routes
 

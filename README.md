@@ -10,10 +10,11 @@ This workspace contains three main apps:
 
 ### Frontend
 
-- React 19
-- Vite
-- Tailwind tooling
+- React 19, TypeScript, Vite, Tailwind
+- Route-owned data/state (React Router for navigation identity, React Query for server state, Context only for genuinely app-wide auth state — no global editor store)
+- Monaco editor, `react-markdown` for AI answers, `@xterm/xterm` for the terminal panel
 - Served through Nginx in Docker
+- See [my-frontend/README.md](D:/project/my-frontend/README.md) for the full architecture
 
 ### Backend
 
@@ -29,9 +30,10 @@ This workspace contains three main apps:
 
 - FastAPI
 - local-first RAG service
-- code indexing for backend + frontend
+- code indexing for backend + frontend, plus per-repo indexing of database-backed repos (fed directly by the backend, not filesystem-based)
 - PR review and diff analysis
-- Docker-backed code execution API
+- Docker-backed one-shot code execution API (`/execute`)
+- Interactive terminal sessions: a real sandboxed container per repo with an attached PTY over a JWT-gated WebSocket, and dynamic port publishing for live-previewing whatever the session runs (requires the host's Docker socket mounted in)
 
 ## Project Tree
 
@@ -112,9 +114,10 @@ docker compose down -v
 
 - builds from `ai-service/Dockerfile`
 - serves FastAPI on port `8000`
-- indexes `my-backend` and `my-frontend` through the mounted project workspace
+- indexes `my-backend` and `my-frontend` through the mounted project workspace, plus per-repo indexing fed directly by `my-backend` (database-backed repos have no filesystem presence)
 - stores vector DB and index artifacts in Docker volumes
 - talks to the `ollama` service over the Compose network for chat/embedding models
+- has the **host's Docker socket mounted in** (`/var/run/docker.sock`) so it can spawn sandboxed terminal-session containers on the host daemon — see "Important Note About the Terminal Feature" below
 
 ## Important Note About AI Models
 
@@ -140,18 +143,24 @@ Until the models finish downloading, the AI service still boots, but AI routes r
 
 If you run the stack without Docker (see "Run Individually Without Docker" below), you still need Ollama installed and running on the host yourself.
 
+## Important Note About the Terminal Feature
+
+The frontend's terminal panel and live-preview links are backed by `ai-service` spawning real, sandboxed containers on the **host's** Docker daemon (Docker-outside-of-Docker) — `docker-compose.yml` mounts `/var/run/docker.sock` into the `ai-service` container for this. This grants `ai-service` control over your host's Docker daemon; standard for local dev tools that run arbitrary containers, but worth knowing before deploying this beyond a local/personal environment.
+
+The terminal WebSocket is JWT-gated (unlike the rest of `ai-service`, which has no auth by design) — `JWT_SECRET` must be set identically on both `backend` and `ai-service` (already wired up in `docker-compose.yml`).
+
+Preview links default to `http://localhost:<port>`, which is correct when your browser runs on the same machine as Docker Desktop. If your browser is elsewhere (LAN, remote VM, devcontainer), set `HOST_PUBLIC_IP` on `ai-service` to an address that machine can actually reach.
+
 ## Important Note About Safe Code Execution
 
-`POST /execute` in `ai-service` uses Docker to run code safely inside short-lived containers.
+`POST /execute` in `ai-service` uses Docker to run one-shot code snippets safely inside short-lived containers. Unlike the terminal feature above (which uses the `docker` Python SDK talking to the socket directly), `docker_runner.py` shells out to the `docker` **CLI binary** via `subprocess` — and that binary is not installed in the `ai-service` image. This means **`/execute` does not work out of the box even with the Docker socket now mounted for the terminal feature** (`docker inspect`/`docker run` calls fail with "Docker is not installed or not available in PATH", surfaced as a clean `400`, not a crash).
 
-Because `ai-service` itself is running in Docker in this setup, the execution endpoint needs Docker daemon access from inside that container if you want it to actually run code there.
+To make `/execute` work too, either:
 
-Current Compose setup includes the API and all wiring, but for real container execution you should use one of these options:
+1. Install the `docker` CLI binary in `ai-service/Dockerfile` (e.g. `apt-get install docker.io` or copy the static `docker` binary), or
+2. Run `ai-service` on the host instead of inside Docker when you need `/execute`
 
-1. Run `ai-service` on the host instead of inside Docker when you need `/execute`
-2. Mount Docker daemon access into the `ai-service` container for your platform
-
-If Docker daemon access is unavailable, `/execute` returns a clean `503` error instead of pretending the run succeeded.
+This is a known gap, not a silent failure — `/execute` reports the missing binary explicitly rather than pretending the run succeeded.
 
 ## Recommended First-Time Setup
 
@@ -165,7 +174,9 @@ Make sure Docker Desktop is running.
 docker compose up --build
 ```
 
-The `ollama` service pulls its models automatically on first run — check `docker compose logs -f ollama` if you want to watch progress.
+The `ollama` service pulls its models automatically on first run — check `docker compose logs -f ollama` if you want to watch progress. The first time you open a terminal session in the app, `ai-service` similarly self-builds its `workspace-terminal` image before starting the container — no manual step needed, just a one-time delay.
+
+`ai-service` mounts your host's Docker socket (for the terminal feature). On Linux this may require your user to be in the `docker` group, or running Docker Compose with elevated permissions — Docker Desktop on Windows/Mac handles this transparently.
 
 ### 3. Initialize the AI Index
 
@@ -195,6 +206,7 @@ http://localhost:3000/ws?token=<access_token>
 ```text
 http://localhost:8000/
 http://localhost:8000/ai/status
+ws://localhost:8000/terminal/<session_id>?token=<access_token>
 ```
 
 ## Run Individually Without Docker
@@ -234,23 +246,27 @@ pip install -r requirements.txt
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
+Running this way, `/execute` and the terminal feature reach the Docker daemon via your local Docker Desktop installation directly — no socket-mount step needed, since there's no ai-service container in between. Set `JWT_SECRET` to the same value as the backend's if you want the terminal feature to work.
+
 ## Service READMEs
 
 Detailed service docs are here:
 
+- [Frontend README](D:/project/my-frontend/README.md)
 - [Backend README](D:/project/my-backend/README.md)
 - [AI Service README](D:/project/ai-service/README.md)
 
 ## What This Setup Gives You
 
-- one command to run frontend, backend, database, and AI service
+- one command to run frontend, backend, database, AI service, and local model server
 - production-style frontend container
-- backend connected to PostgreSQL
-- local-model AI service with indexing and PR review
-- a base for safe code execution through Docker
+- backend connected to PostgreSQL, with GitHub two-way sync and real-time collaboration
+- local-model AI service with global and per-repo indexing, PR review, and one-shot code execution
+- a full in-browser IDE experience: file tree, Monaco editor, AI assistant, and a real interactive terminal with live preview of whatever you run
 
 ## Next Recommended Improvements
 
-- add frontend environment-based API base URL
+- add frontend environment-based API base URL for non-localhost deployments
 - add healthchecks for `postgres`, `backend`, and `frontend` in Docker Compose
-- add Docker daemon mount configuration for `/execute` when you want fully in-container code execution
+- install the `docker` CLI binary in `ai-service`'s image so `/execute` works the same way the terminal feature already does
+- add automated tests across all three services
