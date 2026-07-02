@@ -94,6 +94,19 @@ Passing an optional `repo_id` on `/ai/query` (and `/ai/explain`, `/ai/review`, `
 
 **Preview URLs and `HOST_PUBLIC_IP`:** the reported preview host defaults to `localhost`, since a container-internal "detect my outbound IP" trick would return this service's own Docker-bridge address (unreachable from a browser), not the real Docker host's address. `localhost` is correct when the browser runs on the same machine as Docker Desktop. If your browser is on a different machine (LAN access, a remote VM, a devcontainer), set `HOST_PUBLIC_IP` explicitly to an address that machine can actually reach.
 
+### Live File Sync Back Into the Project
+
+Anything a terminal session creates, edits, or deletes under `/workspace` is periodically synced back into the repo's normal versioned file system in Postgres — not just materialized in one direction at session start. While a terminal WebSocket is connected, a background loop (every `TERMINAL_SYNC_INTERVAL_SECONDS`, default `4`) does the following:
+
+1. Pulls the container's current `/workspace` tree via Docker's `get_archive` API and computes a content hash per file, skipping anything under `TERMINAL_SYNC_EXCLUDED_DIR_NAMES` (`node_modules`, `.git`, `.venv`, `dist`, `build`, `__pycache__`, `.next`, etc. — the same noise-filtering spirit as GitHub import and AI indexing) or over `TERMINAL_SYNC_MAX_FILE_SIZE_BYTES`.
+2. Diffs those hashes against what was last synced for this session.
+3. For anything new or changed, calls `my-backend`'s normal `POST /repos/:repoId/files` / `PATCH /repos/:repoId/files/:fileId`. For anything that disappeared, calls the normal `DELETE`. These are the exact same endpoints the editor itself uses — so terminal-driven changes get real `FileVersion` history and show up in the activity feed with `"...from terminal"` summaries, same as any other edit.
+4. Because those endpoints already broadcast `file:created`/`file:saved`/`file:deleted` over `my-backend`'s WebSocket collaboration gateway, the frontend's file tree updates live with **no additional frontend wiring** — it's the same invalidation path already used for edits made by other collaborators.
+
+This is what lets `ai-service` call back into `my-backend`'s authenticated REST API even though nothing initiated this from a logged-in browser session: it mints its own short-lived (5 minute) access token using the shared `JWT_SECRET`, with the session's `user_id` as the subject — the exact same token shape and verification path `my-backend` already uses for real user sessions, just self-issued. `BACKEND_API_URL` (default `http://localhost:3000/api`, set to `http://backend:3000/api` in `docker-compose.yml`) points this at the backend.
+
+Known v1 tradeoffs: polling (not inotify) means up to `TERMINAL_SYNC_INTERVAL_SECONDS` of staleness, and a change made in the last cycle before a session is destroyed without a final sync can be lost. If the sync's write to a file conflicts with an active editor lock held by another collaborator, that file is skipped for that cycle and retried next cycle rather than erroring the whole sync.
+
 ## Safe Code Runner
 
 The service also includes a Docker-based execution API for running untrusted snippets more safely.
@@ -139,9 +152,12 @@ TERMINAL_MEMORY_LIMIT=256m
 TERMINAL_CPU_LIMIT=0.5
 TERMINAL_PIDS_LIMIT=128
 TERMINAL_IDLE_TIMEOUT_SECONDS=1800
+BACKEND_API_URL=http://localhost:3000/api
+TERMINAL_SYNC_INTERVAL_SECONDS=4
+TERMINAL_SYNC_MAX_FILE_SIZE_BYTES=1000000
 ```
 
-`JWT_SECRET` must match `my-backend`'s `JWT_SECRET` exactly — it's what lets this service verify the same access tokens the rest of the app issues, for the terminal WebSocket only.
+`JWT_SECRET` must match `my-backend`'s `JWT_SECRET` exactly — it's what lets this service verify the same access tokens the rest of the app issues (for the terminal WebSocket), and mint its own short-lived ones (for syncing terminal file changes back into `my-backend`). `BACKEND_API_URL` must point at a reachable `my-backend` — `docker-compose.yml` sets it to `http://backend:3000/api`.
 
 ## Run
 
@@ -305,4 +321,5 @@ Connect a terminal client to `ws://127.0.0.1:8000/terminal/{session_id}?token=<a
 - If the local model server is unavailable, the FastAPI app still boots, but AI routes return `503`
 - The Docker runner (`/execute`) and terminal sessions (`/terminal/*`) both require Docker daemon access and the runtime images to be pullable/buildable the first time
 - `requirements.txt` includes `websockets` explicitly — plain `uvicorn` does not bundle WebSocket support, and without it every `/terminal/{session_id}` connection fails with a silent `404` during the upgrade handshake
+- This is the only service that calls out to another service's authenticated API (`my-backend`) rather than only being called — worth remembering if you're tracing a request and only thinking in the usual frontend → backend → ai-service direction
 - On CPU-only hosts, generation with a full RAG context (retrieved source chunks + question) can take well over a minute for `qwen2.5-coder:7b`. `OLLAMA_TIMEOUT_SECONDS` (default `300`) controls how long `ai-service` waits before giving up on a model response

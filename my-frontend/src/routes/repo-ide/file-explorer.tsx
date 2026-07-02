@@ -12,32 +12,53 @@ import { usePullGithubRepo, usePushGithubRepo } from '../../api/github'
 import { Tabs } from '../../ui/tabs'
 import { pushToast } from '../../ui/toast'
 import type { FileTreeNode, Repo } from '../../types/api'
+import { CreateEntryModal } from './create-entry-modal'
 import { useIde } from './ide-context'
 
 const formatTimestamp = (value: string) =>
   new Date(value).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
 
-function TreeNode({ node, activeFileId, onSelect }: {
+// Empty folders have no file to derive a tree node from, so an empty folder is
+// represented by a hidden `.gitkeep` placeholder file (same convention Git itself
+// uses) — filtered out of the rendered tree so it doesn't show up as a fake file.
+const isPlaceholderFile = (node: FileTreeNode) => node.type === 'file' && node.name === '.gitkeep'
+
+function TreeNode({ node, activeFileId, onSelect, onCreateHere }: {
   node: FileTreeNode
   activeFileId: string | null
   onSelect: (fileId: string, filePath: string) => void
+  onCreateHere?: (path: string) => void
 }) {
   const [expanded, setExpanded] = useState(true)
 
   if (node.type === 'directory') {
+    const visibleChildren = (node.children ?? []).filter((child) => !isPlaceholderFile(child))
+
     return (
       <div className="ml-2">
-        <button
-          type="button"
-          onClick={() => setExpanded((value) => !value)}
-          className="text-left text-sm text-slate-300 hover:text-white"
-        >
-          {expanded ? '▾' : '▸'} {node.name}
-        </button>
+        <div className="group flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => setExpanded((value) => !value)}
+            className="text-left text-sm text-slate-300 hover:text-white"
+          >
+            {expanded ? '▾' : '▸'} {node.name}
+          </button>
+          {onCreateHere ? (
+            <button
+              type="button"
+              onClick={() => onCreateHere(node.path)}
+              className="hidden text-xs text-slate-500 hover:text-cyan-300 group-hover:block"
+              title="New file/folder here"
+            >
+              +
+            </button>
+          ) : null}
+        </div>
         {expanded ? (
           <div className="ml-3 border-l border-white/10 pl-2">
-            {(node.children ?? []).map((child) => (
-              <TreeNode key={child.path} node={child} activeFileId={activeFileId} onSelect={onSelect} />
+            {visibleChildren.map((child) => (
+              <TreeNode key={child.path} node={child} activeFileId={activeFileId} onSelect={onSelect} onCreateHere={onCreateHere} />
             ))}
           </div>
         ) : null}
@@ -78,18 +99,34 @@ export function FileExplorer({ activeRepo }: { activeRepo: Repo | null }) {
   const canEdit = role === 'ADMIN' || role === 'EDITOR'
   const isGithubRepo = activeRepo?.provider === 'github'
 
-  const handleNewFile = async () => {
-    const path = window.prompt('New file path (e.g. src/index.ts)')
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [createDestination, setCreateDestination] = useState('')
 
-    if (!path) {
-      return
-    }
+  const openCreateModal = (destination = '') => {
+    setCreateDestination(destination)
+    setIsCreateModalOpen(true)
+  }
+
+  const handleCreateEntry = async (path: string, type: 'file' | 'folder') => {
+    const targetPath = type === 'folder' ? `${path}/.gitkeep` : path
 
     try {
-      await createFileMutation.mutateAsync({ path, content: '' })
-      pushToast({ title: 'File created', tone: 'success' })
+      const result = await createFileMutation.mutateAsync({ path: targetPath, content: '' })
+      pushToast({ title: type === 'folder' ? 'Folder created' : 'File created', tone: 'success' })
+      setIsCreateModalOpen(false)
+
+      if (type === 'file') {
+        const created = result as { file?: { id: string; path: string } }
+        if (created.file) {
+          openFile(created.file.id, created.file.path)
+        }
+      }
     } catch {
-      pushToast({ title: 'Could not create file', tone: 'error' })
+      pushToast({
+        title: type === 'folder' ? 'Could not create folder' : 'Could not create file',
+        description: 'That path may already exist.',
+        tone: 'error',
+      })
     }
   }
 

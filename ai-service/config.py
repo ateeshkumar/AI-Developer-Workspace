@@ -79,6 +79,20 @@ TERMINAL_PIDS_LIMIT = int(os.getenv("TERMINAL_PIDS_LIMIT", "128"))
 TERMINAL_IDLE_TIMEOUT_SECONDS = int(os.getenv("TERMINAL_IDLE_TIMEOUT_SECONDS", str(30 * 60)))
 TERMINAL_CANDIDATE_PORTS = (3000, 5173, 4200, 8080, 5000, 8000)
 
+BACKEND_API_URL = os.getenv("BACKEND_API_URL", "http://localhost:3000/api")
+TERMINAL_SYNC_INTERVAL_SECONDS = float(os.getenv("TERMINAL_SYNC_INTERVAL_SECONDS", "4"))
+TERMINAL_SYNC_MAX_FILE_SIZE_BYTES = int(os.getenv("TERMINAL_SYNC_MAX_FILE_SIZE_BYTES", str(1_000_000)))
+TERMINAL_SYNC_EXCLUDED_DIR_NAMES = EXCLUDED_DIR_NAMES | {
+    ".venv",
+    "venv",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".next",
+    ".nuxt",
+    "target",
+    ".cache",
+}
+
 
 def ensure_directories() -> None:
     VECTOR_DB_DIR.mkdir(parents=True, exist_ok=True)

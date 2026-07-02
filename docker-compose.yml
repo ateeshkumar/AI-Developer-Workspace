@@ -91,6 +91,8 @@ services:
       TERMINAL_CPU_LIMIT: 0.5
       TERMINAL_PIDS_LIMIT: 128
       TERMINAL_IDLE_TIMEOUT_SECONDS: 1800
+      BACKEND_API_URL: http://backend:3000/api
+      TERMINAL_SYNC_INTERVAL_SECONDS: 4
     ports:
       - "8000:8000"
     volumes:

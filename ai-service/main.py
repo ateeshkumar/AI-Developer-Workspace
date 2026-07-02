@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnec
 
 import terminal_service
 from auth import AuthError, verify_access_token
-from config import AUTO_INDEX_ON_STARTUP, OLLAMA_BASE_URL, ensure_directories
+from config import AUTO_INDEX_ON_STARTUP, OLLAMA_BASE_URL, TERMINAL_SYNC_INTERVAL_SECONDS, ensure_directories
 from docker_runner import CodeExecutionError, RunnerUnavailableError, execute_code
 from llm_client import LocalModelError
 from rag_engine import ensure_index, run_pr_review, run_task
@@ -216,6 +216,13 @@ async def terminal_socket(websocket: WebSocket, session_id: str, token: str = Qu
     reader_thread = threading.Thread(target=read_from_container, daemon=True)
     reader_thread.start()
 
+    async def sync_loop() -> None:
+        while True:
+            await asyncio.sleep(TERMINAL_SYNC_INTERVAL_SECONDS)
+            await asyncio.to_thread(terminal_service.sync_workspace, session_id)
+
+    sync_task = asyncio.create_task(sync_loop())
+
     try:
         while True:
             message = await websocket.receive_text()
@@ -236,6 +243,7 @@ async def terminal_socket(websocket: WebSocket, session_id: str, token: str = Qu
     except WebSocketDisconnect:
         pass
     finally:
+        sync_task.cancel()
         stop_event.set()
         try:
             raw_sock.close()

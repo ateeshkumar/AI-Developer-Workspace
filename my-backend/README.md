@@ -61,6 +61,7 @@ Backend API for auth, users, workspaces, repos, files, versions, and commits.
 - `POST /api/repos/:repoId/terminal/session` fetches a repo's files from Postgres (same bridge pattern as AI indexing) and asks `ai-service` to spawn a sandboxed, interactive Docker container for it
 - The frontend connects its terminal WebSocket **directly** to `ai-service` (not proxied through this backend) — this backend's role is just session creation/teardown and supplying repo content
 - `GET .../terminal/session/:sessionId/ports` / `DELETE .../terminal/session/:sessionId` proxy straight through to `ai-service`
+- While a session is open, `ai-service` periodically calls back into this backend's normal file endpoints (`POST`/`PATCH`/`DELETE .../files`) to persist whatever changed inside the terminal — using a short-lived token it mints itself from the shared `JWT_SECRET`, not a token this backend issued. These calls are indistinguishable from a real user's edits: they go through the same `requireRepoRole` checks, create real `FileVersion` history, and broadcast over the WebSocket gateway like any other save
 
 ### File Module
 

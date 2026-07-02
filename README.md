@@ -151,6 +151,8 @@ The terminal WebSocket is JWT-gated (unlike the rest of `ai-service`, which has 
 
 Preview links default to `http://localhost:<port>`, which is correct when your browser runs on the same machine as Docker Desktop. If your browser is elsewhere (LAN, remote VM, devcontainer), set `HOST_PUBLIC_IP` on `ai-service` to an address that machine can actually reach.
 
+Anything created, edited, or deleted inside a terminal session (`npm install`, `touch foo.js`, editing a file with `vim`, etc.) is periodically synced back into the repo's real, versioned file system — not just a one-way snapshot at session start. `ai-service` polls the container's filesystem every `TERMINAL_SYNC_INTERVAL_SECONDS` (default `4`), diffs it, and pushes changes through `backend`'s normal file endpoints (which already broadcast over the collaboration WebSocket) — so the file tree updates live with no frontend changes needed, and common noise (`node_modules`, `.git`, `.venv`, build output) is filtered out. See [ai-service/README.md](D:/project/ai-service/README.md) for the full mechanics.
+
 ## Important Note About Safe Code Execution
 
 `POST /execute` in `ai-service` uses Docker to run one-shot code snippets safely inside short-lived containers. Unlike the terminal feature above (which uses the `docker` Python SDK talking to the socket directly), `docker_runner.py` shells out to the `docker` **CLI binary** via `subprocess` — and that binary is not installed in the `ai-service` image. This means **`/execute` does not work out of the box even with the Docker socket now mounted for the terminal feature** (`docker inspect`/`docker run` calls fail with "Docker is not installed or not available in PATH", surfaced as a clean `400`, not a crash).
