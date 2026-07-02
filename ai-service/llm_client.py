@@ -3,7 +3,12 @@ import urllib.error
 import urllib.request
 from typing import Any, Dict, List
 
-from config import OLLAMA_BASE_URL, OLLAMA_CHAT_MODEL, OLLAMA_EMBED_MODEL
+from config import (
+    OLLAMA_BASE_URL,
+    OLLAMA_CHAT_MODEL,
+    OLLAMA_EMBED_MODEL,
+    OLLAMA_TIMEOUT_SECONDS,
+)
 
 
 class LocalModelError(RuntimeError):
@@ -19,7 +24,7 @@ def _post_json(path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     )
 
     try:
-        with urllib.request.urlopen(request, timeout=120) as response:
+        with urllib.request.urlopen(request, timeout=OLLAMA_TIMEOUT_SECONDS) as response:
             body = response.read().decode("utf-8")
             return json.loads(body)
     except urllib.error.HTTPError as error:

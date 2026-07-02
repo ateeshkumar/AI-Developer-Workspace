@@ -49,6 +49,7 @@ project/
 - Backend API: `http://localhost:3000`
 - AI Service: `http://localhost:8000`
 - PostgreSQL: `localhost:5432`
+- Ollama: `http://localhost:11434`
 
 ## Run Everything With Docker
 
@@ -63,6 +64,7 @@ This starts:
 - `postgres`
 - `backend`
 - `frontend`
+- `ollama`
 - `ai-service`
 
 Stop all services:
@@ -98,31 +100,33 @@ docker compose down -v
 - serves static files with Nginx
 - exposed at port `5173`
 
+### `ollama`
+
+- image: `ollama/ollama`
+- serves the local model API on port `11434`
+- pulls `qwen2.5-coder:7b` and `nomic-embed-text` on first startup
+- persists downloaded models in the `ollama_data` volume
+
 ### `ai-service`
 
 - builds from `ai-service/Dockerfile`
 - serves FastAPI on port `8000`
 - indexes `my-backend` and `my-frontend` through the mounted project workspace
 - stores vector DB and index artifacts in Docker volumes
+- talks to the `ollama` service over the Compose network for chat/embedding models
 
 ## Important Note About AI Models
 
-The AI service is API-key free and expects your own local model server.
+The AI service is API-key free and self-contained: it runs its own local model server.
 
-Default configuration points to:
+`docker compose up` starts an `ollama` service alongside `postgres`, `backend`, `frontend`, and `ai-service`. On first startup, `ollama` automatically pulls:
 
 ```text
-http://host.docker.internal:11434
+qwen2.5-coder:7b
+nomic-embed-text
 ```
 
-Recommended local models:
-
-```bash
-ollama pull qwen2.5-coder:7b
-ollama pull nomic-embed-text
-```
-
-Run Ollama on the host machine before using:
+This first pull downloads several GB and can take a while depending on your connection. `ai-service` waits for `ollama` to report healthy before starting, but it still queues behind the model pull for:
 
 - `POST /ai/index`
 - `POST /ai/query`
@@ -131,7 +135,9 @@ Run Ollama on the host machine before using:
 - `POST /ai/refactor`
 - `POST /ai/pr-review`
 
-Without Ollama running, the AI service still boots, but AI routes return `503`.
+Until the models finish downloading, the AI service still boots, but AI routes return `503`. Model data persists in the `ollama_data` Docker volume, so subsequent `docker compose up` runs skip the download.
+
+If you run the stack without Docker (see "Run Individually Without Docker" below), you still need Ollama installed and running on the host yourself.
 
 ## Important Note About Safe Code Execution
 
@@ -152,28 +158,15 @@ If Docker daemon access is unavailable, `/execute` returns a clean `503` error i
 
 Make sure Docker Desktop is running.
 
-### 2. Start Ollama on the Host
-
-Example:
-
-```bash
-ollama serve
-```
-
-### 3. Pull the Local Models
-
-```bash
-ollama pull qwen2.5-coder:7b
-ollama pull nomic-embed-text
-```
-
-### 4. Start the Stack
+### 2. Start the Stack
 
 ```bash
 docker compose up --build
 ```
 
-### 5. Initialize the AI Index
+The `ollama` service pulls its models automatically on first run — check `docker compose logs -f ollama` if you want to watch progress.
+
+### 3. Initialize the AI Index
 
 ```bash
 curl -X POST http://localhost:8000/ai/index ^
@@ -219,7 +212,7 @@ npm run dev -- --host 0.0.0.0
 cd my-backend
 npm install
 npm run prisma:generate
-npm run db:push
+npm run migrate:deploy
 npm start
 ```
 
@@ -256,8 +249,6 @@ Detailed service docs are here:
 
 ## Next Recommended Improvements
 
-- add backend startup migration command in container entrypoint
 - add frontend environment-based API base URL
-- add healthchecks in Docker Compose
-- add optional Ollama service profile if you want models inside Docker
+- add healthchecks for `postgres`, `backend`, and `frontend` in Docker Compose
 - add Docker daemon mount configuration for `/execute` when you want fully in-container code execution

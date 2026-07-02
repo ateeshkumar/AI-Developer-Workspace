@@ -2,6 +2,8 @@
 node_modules/
 my-backend/node_modules/
 my-frontend/node_modules/
+my-backend/prisma/migrations/
+
 
 # Environment files
 .env
@@ -42,6 +44,8 @@ my-frontend/*.log
 .vscode/
 *.suo
 *.swp
+
+INTERVIEW_QA_SHORT.md
 
 # Python cache
 __pycache__/

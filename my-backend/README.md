@@ -119,11 +119,13 @@ Generate Prisma client:
 npm run prisma:generate
 ```
 
-Sync database schema:
+Apply migrations:
 
 ```bash
-npm run db:push
+npm run migrate:deploy
 ```
+
+During active development, when you change `schema.prisma` and want to generate a new migration file, use `npm run migrate:dev` instead. Avoid `npm run db:push` for anything beyond quick local experiments — it syncs the schema directly and does not record a migration, which causes drift between `prisma/migrations` and the database.
 
 ## Run the Server
 
@@ -677,9 +679,8 @@ curl -X POST http://localhost:3000/api/repos/REPO_ID/commits ^
 
 ## Important Notes
 
-- `prisma db push` was used to sync the schema during development
-- If you want migration files for production workflows, create proper Prisma migrations next
-- Old migration files in `prisma/migrations` may no longer represent the current final schema
+- Schema changes are tracked as Prisma migrations in `prisma/migrations`; apply them with `npm run migrate:deploy` (or `prisma migrate dev` while developing)
+- `docker-compose.yml` runs `prisma migrate deploy` on container start, so the migration history is the source of truth for the schema
 
 ## Suggested Next Improvements
 

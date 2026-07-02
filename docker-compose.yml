@@ -19,7 +19,7 @@ services:
     restart: unless-stopped
     depends_on:
       - postgres
-    command: sh -c "npx prisma db push && npm start"
+    command: sh -c "npx prisma migrate deploy && npm start"
     environment:
       PORT: 3000
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ai_hit
@@ -38,20 +38,46 @@ services:
     ports:
       - "5173:80"
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: project-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "ollama serve &
+       sleep 3 &&
+       ollama pull qwen2.5-coder:7b &&
+       ollama pull nomic-embed-text &&
+       wait"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
   ai-service:
     build:
       context: ./ai-service
     container_name: project-ai-service
     restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_started
+      ollama:
+        condition: service_healthy
     environment:
       AI_PROJECT_ROOT: /workspace
       AI_INCLUDE_DIRS: my-backend,my-frontend
       AI_AUTO_INDEX_ON_STARTUP: "false"
-      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_CHAT_MODEL: qwen2.5-coder:7b
       OLLAMA_EMBED_MODEL: nomic-embed-text
+      OLLAMA_TIMEOUT_SECONDS: 300
       RUNNER_TIMEOUT_SECONDS: 10
       RUNNER_MEMORY_LIMIT: 256m
       RUNNER_CPU_LIMIT: 0.5
@@ -68,3 +94,4 @@ volumes:
   postgres_data:
   ai_vector_db:
   ai_embeddings:
+  ollama_data:

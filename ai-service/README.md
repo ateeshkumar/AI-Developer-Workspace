@@ -59,6 +59,8 @@ ollama pull nomic-embed-text
 
 You can change models with environment variables.
 
+When this service is run through the root `docker-compose.yml`, Ollama is bundled as its own `ollama` service and `OLLAMA_BASE_URL` is set to `http://ollama:11434` automatically — no host setup required. The `127.0.0.1` default above only applies when running `ai-service` directly on the host (see "Run" below), where you still need Ollama installed and running yourself.
+
 ## Safe Code Runner
 
 The service also includes a Docker-based execution API for running untrusted snippets more safely.
@@ -86,6 +88,7 @@ Safety defaults:
 OLLAMA_BASE_URL=http://127.0.0.1:11434
 OLLAMA_CHAT_MODEL=qwen2.5-coder:7b
 OLLAMA_EMBED_MODEL=nomic-embed-text
+OLLAMA_TIMEOUT_SECONDS=300
 AI_INCLUDE_DIRS=my-backend,my-frontend
 AI_CHUNK_SIZE=1400
 AI_CHUNK_OVERLAP=200
@@ -232,3 +235,4 @@ Example response:
 - The latest index summary is stored at `ai-service/embeddings/latest-index.json`
 - If the local model server is unavailable, the FastAPI app still boots, but AI routes return `503`
 - The Docker runner requires Docker daemon access and the runtime images to be pullable the first time
+- On CPU-only hosts, generation with a full RAG context (retrieved source chunks + question) can take well over a minute for `qwen2.5-coder:7b`. `OLLAMA_TIMEOUT_SECONDS` (default `300`) controls how long `ai-service` waits before giving up on a model response
