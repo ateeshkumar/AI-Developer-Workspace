@@ -40,34 +40,32 @@ services:
     ports:
       - "5173:80"
 
-  ollama:
-    image: ollama/ollama:latest
-    container_name: project-ollama
-    restart: unless-stopped
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    entrypoint: ["/bin/sh", "-c"]
-    command: >
-      "ollama serve &
-       sleep 3 &&
-       ollama pull qwen2.5-coder:7b &&
-       ollama pull nomic-embed-text &&
-       wait"
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 10s
-      timeout: 5s
-      retries: 30
-      start_period: 30s
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: project-ollama
+  #   restart: unless-stopped
+  #   environment:
+  #     # Keep the model resident in memory between requests instead of Ollama's
+  #     # default 5-minute unload -- avoids paying a full model-load cost on every
+  #     # query after a short idle gap. Set to "-1" to never unload.
+  #     OLLAMA_KEEP_ALIVE: 30m
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   entrypoint: ["/bin/sh", "-c"]
+  #   command: |
+  #     "ollama serve &
+  #      sleep 3 &&
+  #      ollama pull qwen2.5-coder:3b &&
+  #      ollama pull nomic-embed-text &&
+  #      wait"
+  #   healthcheck:
+  #     test: ["CMD", "ollama", "list"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 30
+  #     start_period: 30s
 
   ai-service:
     build:
@@ -77,16 +75,18 @@ services:
     depends_on:
       backend:
         condition: service_started
-      ollama:
-        condition: service_healthy
+      # ollama:
+      #   condition: service_healthy
     environment:
       AI_PROJECT_ROOT: /workspace
       AI_INCLUDE_DIRS: my-backend,my-frontend
       AI_AUTO_INDEX_ON_STARTUP: "false"
       OLLAMA_BASE_URL: http://ollama:11434
-      OLLAMA_CHAT_MODEL: qwen2.5-coder:7b
+      OLLAMA_CHAT_MODEL: qwen2.5-coder:3b
       OLLAMA_EMBED_MODEL: nomic-embed-text
       OLLAMA_TIMEOUT_SECONDS: 300
+      OLLAMA_NUM_PREDICT: 700
+      AI_TOP_K: 3
       RUNNER_TIMEOUT_SECONDS: 10
       RUNNER_MEMORY_LIMIT: 256m
       RUNNER_CPU_LIMIT: 0.5

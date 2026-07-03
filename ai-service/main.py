@@ -8,6 +8,7 @@ import terminal_service
 from auth import AuthError, verify_access_token
 from config import AUTO_INDEX_ON_STARTUP, OLLAMA_BASE_URL, TERMINAL_SYNC_INTERVAL_SECONDS, ensure_directories
 from docker_runner import CodeExecutionError, RunnerUnavailableError, execute_code
+from external_llm_client import ExternalProviderError, verify_key
 from llm_client import LocalModelError
 from rag_engine import ensure_index, run_pr_review, run_task
 from repo_indexer import get_index_summary, index_repo_files, index_repositories
@@ -23,6 +24,8 @@ from schemas import (
     PRReviewRequest,
     PRReviewResponse,
     TerminalSessionResponse,
+    VerifyProviderKeyRequest,
+    VerifyProviderKeyResponse,
 )
 from diff_analyzer import analyze_diff
 from terminal_service import TerminalError
@@ -98,6 +101,8 @@ def ai_query(payload: AIRequest):
         return run_task("query", payload.model_dump())
     except LocalModelError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
+    except ExternalProviderError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
 
 
 @app.post("/ai/explain", response_model=AIResponse)
@@ -106,6 +111,8 @@ def ai_explain(payload: AIRequest):
         return run_task("explain", payload.model_dump())
     except LocalModelError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
+    except ExternalProviderError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
 
 
 @app.post("/ai/review", response_model=AIResponse)
@@ -114,6 +121,8 @@ def ai_review(payload: AIRequest):
         return run_task("review", payload.model_dump())
     except LocalModelError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
+    except ExternalProviderError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
 
 
 @app.post("/ai/refactor", response_model=AIResponse)
@@ -122,6 +131,17 @@ def ai_refactor(payload: AIRequest):
         return run_task("refactor", payload.model_dump())
     except LocalModelError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
+    except ExternalProviderError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
+
+@app.post("/ai/providers/verify", response_model=VerifyProviderKeyResponse)
+def ai_verify_provider_key(payload: VerifyProviderKeyRequest):
+    try:
+        verify_key(payload.provider, payload.api_key)
+        return VerifyProviderKeyResponse(valid=True)
+    except ExternalProviderError as error:
+        return VerifyProviderKeyResponse(valid=False, detail=str(error))
 
 
 @app.post("/ai/diff-analyze", response_model=DiffStats)

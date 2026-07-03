@@ -209,3 +209,10 @@ export type AIQueryResponse = {
   sources: AISource[]
   prompt_preview: string
 }
+
+export type AiAssistantProvider = 'local' | 'claude' | 'openai'
+
+export type AiProviderStatus = {
+  claude: { connected: boolean; connectedAt?: string }
+  openai: { connected: boolean; connectedAt?: string }
+}

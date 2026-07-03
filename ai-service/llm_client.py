@@ -7,6 +7,7 @@ from config import (
     OLLAMA_BASE_URL,
     OLLAMA_CHAT_MODEL,
     OLLAMA_EMBED_MODEL,
+    OLLAMA_NUM_PREDICT,
     OLLAMA_TIMEOUT_SECONDS,
 )
 
@@ -67,6 +68,7 @@ def generate_text(system_prompt: str, user_prompt: str) -> str:
             "system": system_prompt,
             "prompt": user_prompt,
             "stream": False,
+            "options": {"num_predict": OLLAMA_NUM_PREDICT},
         },
     )
 

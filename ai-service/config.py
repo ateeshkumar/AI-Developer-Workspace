@@ -54,13 +54,29 @@ SUPPORTED_FILENAMES = {
 
 CHUNK_SIZE = int(os.getenv("AI_CHUNK_SIZE", "1400"))
 CHUNK_OVERLAP = int(os.getenv("AI_CHUNK_OVERLAP", "200"))
-TOP_K = int(os.getenv("AI_TOP_K", "6"))
+# Lower default than a "full" RAG top-k: on CPU-only / memory-constrained hosts,
+# prompt length (prefill time) is the dominant cost -- fewer retrieved chunks
+# means a meaningfully faster response at the cost of narrower context.
+TOP_K = int(os.getenv("AI_TOP_K", "3"))
 AUTO_INDEX_ON_STARTUP = os.getenv("AI_AUTO_INDEX_ON_STARTUP", "false").lower() == "true"
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
-OLLAMA_CHAT_MODEL = os.getenv("OLLAMA_CHAT_MODEL", "qwen2.5-coder:7b")
+# 3b, not 7b: on memory-constrained hosts, a 7b model competing with a full
+# docker-compose stack + a normal desktop for RAM causes severe slowdowns/hangs
+# (observed directly: system had ~1GB truly available RAM against a 4.7GB model).
+OLLAMA_CHAT_MODEL = os.getenv("OLLAMA_CHAT_MODEL", "qwen2.5-coder:3b")
 OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
 OLLAMA_TIMEOUT_SECONDS = int(os.getenv("OLLAMA_TIMEOUT_SECONDS", "300"))
+# Caps generation length so a runaway/verbose completion can't single-handedly
+# blow the timeout budget above.
+OLLAMA_NUM_PREDICT = int(os.getenv("OLLAMA_NUM_PREDICT", "700"))
+
+# BYO-key external providers (Part of the "Claude" / "Codex" assistant tabs) --
+# retrieval/embeddings always stay local via Ollama above; only the final
+# generation call goes out to the provider, using the user's own API key.
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
+EXTERNAL_LLM_TIMEOUT_SECONDS = int(os.getenv("EXTERNAL_LLM_TIMEOUT_SECONDS", "60"))
 
 RUNNER_TIMEOUT_SECONDS = int(os.getenv("RUNNER_TIMEOUT_SECONDS", "10"))
 RUNNER_MEMORY_LIMIT = os.getenv("RUNNER_MEMORY_LIMIT", "256m")

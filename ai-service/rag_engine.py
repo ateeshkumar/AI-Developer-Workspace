@@ -1,11 +1,31 @@
 from typing import Dict, List, Tuple
 
-from config import OLLAMA_CHAT_MODEL, OLLAMA_EMBED_MODEL, TOP_K
+from config import ANTHROPIC_MODEL, OLLAMA_CHAT_MODEL, OLLAMA_EMBED_MODEL, OPENAI_MODEL, TOP_K
 from diff_analyzer import analyze_diff
-from llm_client import embed_text, extract_json_block, generate_text
+from external_llm_client import ExternalProviderError, query_claude, query_openai
+from llm_client import LocalModelError, embed_text, extract_json_block, generate_text
 from repo_indexer import get_index_summary, index_repositories
 from schemas import SourceChunk
 import vector_store
+
+EMPTY_INDEX_SUMMARY = {
+    "indexed_files": 0,
+    "indexed_chunks": 0,
+    "included_roots": [],
+    "created_at": None,
+}
+
+
+def _generate(provider: str, api_key: str | None, system_prompt: str, user_prompt: str) -> Tuple[str, str]:
+    if provider == "claude":
+        if not api_key:
+            raise ExternalProviderError("Connect your Claude API key first")
+        return query_claude(api_key, system_prompt, user_prompt), ANTHROPIC_MODEL
+    if provider == "openai":
+        if not api_key:
+            raise ExternalProviderError("Connect your Codex (OpenAI) API key first")
+        return query_openai(api_key, system_prompt, user_prompt), OPENAI_MODEL
+    return generate_text(system_prompt, user_prompt), OLLAMA_CHAT_MODEL
 
 
 SYSTEM_PROMPTS = {
@@ -102,12 +122,25 @@ def _build_user_prompt(task: str, payload: Dict, matches: List[Dict]) -> str:
 
 
 def run_task(task: str, payload: Dict) -> Dict:
+    provider = payload.get("provider") or "local"
+    api_key = payload.get("api_key")
+
     query_text = payload.get("question") or payload.get("target") or payload.get("code") or payload.get("diff") or task
-    matches, summary = retrieve_context(
-        query_text, top_k=payload.get("top_k") or TOP_K, repo_id=payload.get("repo_id")
-    )
+    try:
+        matches, summary = retrieve_context(
+            query_text, top_k=payload.get("top_k") or TOP_K, repo_id=payload.get("repo_id")
+        )
+    except LocalModelError:
+        # Retrieval embeds via the local Ollama model -- if that's unreachable,
+        # an external provider (Claude/Codex) can still answer without RAG
+        # context rather than failing outright. The local provider still needs
+        # Ollama for both embedding and generation, so it re-raises.
+        if provider == "local":
+            raise
+        matches, summary = [], EMPTY_INDEX_SUMMARY
+
     prompt = _build_user_prompt(task, payload, matches)
-    answer = generate_text(SYSTEM_PROMPTS[task], prompt)
+    answer, model_name = _generate(provider, api_key, SYSTEM_PROMPTS[task], prompt)
 
     sources = [
         SourceChunk(
@@ -124,7 +157,7 @@ def run_task(task: str, payload: Dict) -> Dict:
 
     return {
         "answer": answer,
-        "model": OLLAMA_CHAT_MODEL,
+        "model": model_name,
         "embedding_model": OLLAMA_EMBED_MODEL,
         "indexed_files": summary["indexed_files"],
         "indexed_chunks": summary["indexed_chunks"],

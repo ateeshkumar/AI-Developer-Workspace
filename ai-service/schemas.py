@@ -37,6 +37,8 @@ class AIRequest(BaseModel):
     diff: Optional[str] = None
     instructions: Optional[str] = None
     repo_id: Optional[str] = None
+    provider: str = "local"
+    api_key: Optional[str] = None
 
 
 class AIResponse(BaseModel):
@@ -107,6 +109,16 @@ class TerminalSessionResponse(BaseModel):
     session_id: str
     host: str
     ports: Dict[str, Optional[int]]
+
+
+class VerifyProviderKeyRequest(BaseModel):
+    provider: str
+    api_key: str
+
+
+class VerifyProviderKeyResponse(BaseModel):
+    valid: bool
+    detail: Optional[str] = None
 
 
 class ExecuteRequest(BaseModel):
